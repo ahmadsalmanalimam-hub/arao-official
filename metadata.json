@@ -1,0 +1,6 @@
+{
+  "name": "ARAO - Next-Gen Short Video Social Media",
+  "description": "ARAO is a premium short-video social networking platform with a black-and-gold visual identity, vertical video feeds, creator publishing, interactions, and direct messaging.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

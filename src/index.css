@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --primary-violet: #7000FF;
+    --electric-purple: #8B00FF;
+    --deep-purple: #3900A8;
+    --accent-red: #FF1744;
+    --bg-main: #080810;
+    --bg-secondary: #12121C;
+    --bg-card: #1A1926;
+    --text-primary: #FFFFFF;
+    --text-secondary: #A5A5B5;
+  }
+
+  body {
+    background-color: #080810;
+    color: #FFFFFF;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Custom luxury scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #080810;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #232236;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #8B00FF;
+  }
+}
+
+.font-display {
+  font-family: 'Syne', sans-serif;
+}
+
+.purple-gradient-text {
+  background: linear-gradient(135deg, #FFFFFF 0%, #D8B4FE 30%, #8B00FF 75%, #7000FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.purple-gradient-bg {
+  background: linear-gradient(135deg, #8B00FF 0%, #7000FF 60%, #3900A8 100%);
+}
+
+.purple-red-gradient {
+  background: linear-gradient(135deg, #7000FF 0%, #8B00FF 55%, #FF1744 100%);
+}
+
+.purple-glow {
+  box-shadow: 0 0 25px rgba(139, 0, 255, 0.35);
+}
+
+.purple-glow-subtle {
+  box-shadow: 0 0 15px rgba(139, 0, 255, 0.18);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 7s linear infinite;
+}
+
+@keyframes float-heart {
+  0% {
+    opacity: 1;
+    transform: scale(0.6) translateY(0) rotate(-10deg);
+  }
+  50% {
+    transform: scale(1.3) translateY(-30px) rotate(8deg);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.6) translateY(-80px) rotate(15deg);
+  }
+}
+
+.animate-float-heart {
+  animation: float-heart 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
