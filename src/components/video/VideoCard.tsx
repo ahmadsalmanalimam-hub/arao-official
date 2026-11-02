@@ -14,7 +14,8 @@ import {
   Flag,
   Sliders,
   Loader2,
-  Ban
+  Ban,
+  Repeat
 } from 'lucide-react';
 import { VideoItem } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -25,10 +26,13 @@ import {
   checkUserBookmarked,
   incrementVideoViews,
   incrementVideoDownloads,
-  recordWatchHistory
+  recordWatchHistory,
+  voteOnPostPoll,
+  repostVideo
 } from '../../services/videoService';
 import { followUser, checkFollowStatus } from '../../services/userService';
 import { getVideoQualityUrl, downloadVideoFile } from '../../lib/cloudinary';
+import { VerifiedBadge } from '../common/VerifiedBadge';
 
 interface VideoCardProps {
   video: VideoItem;
@@ -86,6 +90,29 @@ export const VideoCard: React.FC<VideoCardProps> = ({
   const [downloading, setDownloading] = useState(false);
   const [downloadPercent, setDownloadPercent] = useState(0);
   const [downloadToast, setDownloadToast] = useState<string | null>(null);
+
+  // Photo / Slideshow support
+  const isPhotoPost = (video as any).mediaType === 'photo' || (video as any).mediaType === 'slideshow' || Boolean((video as any).photoUrls?.length);
+  const photoUrls: string[] = (video as any).photoUrls && (video as any).photoUrls.length > 0
+    ? (video as any).photoUrls
+    : (isPhotoPost ? [video.thumbnailUrl || video.videoUrl] : []);
+  const isSlideshow = photoUrls.length > 1;
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+
+  // Text post & Poll support
+  const isTextPost = video.postType === 'text' || (video as any).mediaType === 'text' || Boolean(video.textPostData);
+  const [currentPoll, setCurrentPoll] = useState<any>(video.poll);
+  const [hasReposted, setHasReposted] = useState(false);
+  const [repostCount, setRepostCount] = useState(video.repostCount || 0);
+
+  // Auto-advance slideshow slides
+  useEffect(() => {
+    if (!isActive || !isSlideshow) return;
+    const interval = setInterval(() => {
+      setCurrentSlideIndex((prev) => (prev + 1) % photoUrls.length);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, [isActive, isSlideshow, photoUrls.length]);
 
   // Determine stream URL with quality applied
   const activeVideoUrl = getVideoQualityUrl(video.videoUrl, selectedQuality);
@@ -232,6 +259,30 @@ export const VideoCard: React.FC<VideoCardProps> = ({
     }
   };
 
+  const handleVote = async (optionIdx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      openAuthModal('login');
+      return;
+    }
+    const updated = await voteOnPostPoll(video.videoId, user.uid, optionIdx);
+    if (updated) setCurrentPoll(updated);
+  };
+
+  const handleRepost = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user || !profile) {
+      openAuthModal('login');
+      return;
+    }
+    if (hasReposted) return;
+    setHasReposted(true);
+    setRepostCount((c) => c + 1);
+    await repostVideo(video, { uid: user.uid, username: profile.username, avatar: profile.avatar });
+    setDownloadToast('Reposted to your ARAO feed! ⚡');
+    setTimeout(() => setDownloadToast(null), 2500);
+  };
+
   const handleFollowClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user || !profile) {
@@ -300,18 +351,95 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       onClick={handleContainerClick}
       className="relative w-full h-full bg-[#080810] select-none overflow-hidden flex items-center justify-center cursor-pointer"
     >
-      {/* 100% True Full-Screen Video presentation */}
-      <video
-        ref={videoRef}
-        src={activeVideoUrl}
-        poster={video.thumbnailUrl}
-        playsInline
-        loop
-        muted={!soundEnabled}
-        onWaiting={() => setIsBuffering(true)}
-        onPlaying={() => setIsBuffering(false)}
-        className="w-full h-full object-cover"
-      />
+      {/* 100% True Full-Screen Video, Photo, or Colorful Text presentation */}
+      {isTextPost ? (
+        <div
+          className={`relative w-full h-full bg-gradient-to-br ${
+            video.textPostData?.bgGradient || 'from-[#3900A8] via-[#8A2BE2] to-[#7000FF]'
+          } flex flex-col items-center justify-center p-6 text-center select-none overflow-hidden`}
+        >
+          <div className="max-w-xs space-y-4 relative z-20">
+            <p
+              className={`text-2xl sm:text-3xl font-black text-white drop-shadow-xl leading-relaxed ${
+                video.textPostData?.font === 'serif' ? 'font-serif' :
+                video.textPostData?.font === 'mono' ? 'font-mono' : 'font-display'
+              } ${
+                video.textPostData?.animation === 'pulse' ? 'animate-pulse' :
+                video.textPostData?.animation === 'bounce' ? 'animate-bounce' : ''
+              }`}
+            >
+              {video.textPostData?.text || video.caption}
+            </p>
+
+            {/* Interactive Poll widget if present */}
+            {currentPoll && (
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="mt-6 p-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/20 text-left space-y-2.5 shadow-2xl"
+              >
+                <span className="text-xs font-bold text-purple-200 block">📊 {currentPoll.question}</span>
+                <div className="space-y-1.5">
+                  {currentPoll.options?.map((opt: any, oIdx: number) => {
+                    const totalVotes = currentPoll.options.reduce((acc: number, o: any) => acc + (o.votes || 0), 0);
+                    const pct = totalVotes > 0 ? Math.round(((opt.votes || 0) / totalVotes) * 100) : 0;
+                    const isMyVote = user && currentPoll.voters?.[user.uid] === oIdx;
+                    return (
+                      <button
+                        key={oIdx}
+                        onClick={(e) => handleVote(oIdx, e)}
+                        className={`relative w-full p-2.5 rounded-xl border text-left overflow-hidden flex items-center justify-between text-xs transition-all cursor-pointer ${
+                          isMyVote
+                            ? 'border-amber-400 bg-amber-400/20 text-amber-200 font-bold'
+                            : 'border-white/15 bg-white/5 text-white hover:bg-white/10'
+                        }`}
+                      >
+                        <div
+                          className="absolute inset-y-0 left-0 bg-white/15 pointer-events-none transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
+                        <span className="relative z-10">{opt.text}</span>
+                        <span className="relative z-10 font-mono text-[11px] font-bold">{pct}%</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
+        </div>
+      ) : isPhotoPost ? (
+        <div className="relative w-full h-full bg-black flex items-center justify-center overflow-hidden">
+          <img
+            src={photoUrls[currentSlideIndex] || video.thumbnailUrl || video.videoUrl}
+            alt="ARAO Post"
+            className="w-full h-full object-cover transition-opacity duration-500 ease-in-out"
+          />
+          {/* Subtle gradient overlay */}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-transparent to-black/60 pointer-events-none" />
+
+          {/* Slideshow pagination pill */}
+          {isSlideshow && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-[11px] font-mono text-white flex items-center gap-1.5 shadow-lg">
+              <span className="font-bold text-[#D8B4FE]">{currentSlideIndex + 1}</span>
+              <span className="text-gray-400">/</span>
+              <span>{photoUrls.length}</span>
+            </div>
+          )}
+        </div>
+      ) : (
+        <video
+          ref={videoRef}
+          src={activeVideoUrl}
+          poster={video.thumbnailUrl}
+          playsInline
+          loop
+          muted={!soundEnabled}
+          onWaiting={() => setIsBuffering(true)}
+          onPlaying={() => setIsBuffering(false)}
+          className="w-full h-full object-cover"
+        />
+      )}
 
       {/* Buffering Indicator */}
       {isBuffering && (
@@ -376,10 +504,10 @@ export const VideoCard: React.FC<VideoCardProps> = ({
       {/* Subtle Bottom Gradient for readable captions */}
       <div className="absolute inset-x-0 bottom-0 h-80 bg-gradient-to-t from-black via-black/40 to-transparent pointer-events-none z-10" />
 
-      {/* Compact Video Engagement Rail on the Right */}
+      {/* Compact Video Engagement Rail on the Right - shifted down to fill gap */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="absolute right-2.5 bottom-20 z-20 flex flex-col items-center gap-3 text-white"
+        className="absolute right-2.5 bottom-16 sm:bottom-18 z-20 flex flex-col items-center gap-3.5 text-white"
       >
         {/* Creator Profile Picture & Follow Button */}
         <div className="relative mb-1">
@@ -445,27 +573,27 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </span>
         </div>
 
-        {/* Bookmark / Save Button */}
+        {/* Favorite Button (Bookmark Outline, labeled Favorite) */}
         <div className="flex flex-col items-center">
           <button
             onClick={handleBookmarkClick}
             className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all cursor-pointer"
-            aria-label="Bookmark"
+            aria-label="Favorite"
           >
             <Bookmark
               className={`w-7 h-7 transition-colors ${
                 bookmarked
-                  ? 'text-[#8B00FF] fill-[#8B00FF] filter drop-shadow-[0_0_12px_rgba(139,0,255,0.8)]'
+                  ? 'text-[#8B00FF] fill-[#8B00FF] filter drop-shadow-[0_0_12px_rgba(139,0,255,0.85)]'
                   : 'text-white'
               }`}
             />
           </button>
           <span className="text-[11px] font-semibold tracking-tight text-gray-300">
-            Save
+            Favorite
           </span>
         </div>
 
-        {/* Share Button */}
+        {/* Share Button (Opens Premium Share Sheet) */}
         <div className="flex flex-col items-center">
           <button
             onClick={() => onOpenShare(video)}
@@ -479,26 +607,19 @@ export const VideoCard: React.FC<VideoCardProps> = ({
           </span>
         </div>
 
-        {/* Download Button (Real Video Download) */}
+        {/* Repost Button */}
         <div className="flex flex-col items-center">
           <button
-            onClick={handleDownloadClick}
-            disabled={downloading}
+            onClick={handleRepost}
             className={`w-10 h-10 rounded-full flex items-center justify-center hover:bg-white/10 active:scale-90 transition-all cursor-pointer ${
-              video.allowDownload === false ? 'opacity-40' : ''
+              hasReposted ? 'text-emerald-400' : 'text-white'
             }`}
-            title={video.allowDownload === false ? 'Downloads disabled by creator' : 'Download video'}
+            aria-label="Repost"
           >
-            {downloading ? (
-              <Loader2 className="w-6 h-6 animate-spin text-[#8B00FF]" />
-            ) : video.allowDownload === false ? (
-              <Ban className="w-6 h-6 text-gray-400" />
-            ) : (
-              <Download className="w-6 h-6 text-white" />
-            )}
+            <Repeat className="w-6 h-6" />
           </button>
           <span className="text-[11px] font-semibold tracking-tight text-gray-300">
-            {downloading ? `${downloadPercent}%` : 'Save'}
+            {repostCount > 0 ? (repostCount > 999 ? `${(repostCount / 1000).toFixed(1)}k` : repostCount) : 'Repost'}
           </span>
         </div>
 
@@ -553,14 +674,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         >
           <span className="font-semibold text-base text-white group-hover:text-[#D8B4FE] transition-colors flex items-center gap-1.5 drop-shadow-md">
             @{video.username}
-            {(isCreatorVerified || video.username === 'arao') && (
-              <span
-                className="w-4 h-4 rounded-full bg-gradient-to-tr from-[#7000FF] to-[#8B00FF] text-white text-[9px] font-bold inline-flex items-center justify-center shadow-[0_0_8px_rgba(139,0,255,0.7)]"
-                title="Verified Official Creator"
-              >
-                ✓
-              </span>
-            )}
+            <VerifiedBadge
+              badgeType={(video as any).badgeType || ((isCreatorVerified || video.username === 'arao') ? 'creator_purple' : 'none')}
+              isVerified={isCreatorVerified || video.username === 'arao'}
+              size="sm"
+            />
           </span>
           {video.category && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-purple-200 border border-white/10 uppercase tracking-wider font-medium">

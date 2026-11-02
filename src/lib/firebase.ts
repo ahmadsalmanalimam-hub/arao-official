@@ -1,6 +1,13 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
+import {
+  initializeFirestore,
+  getFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  memoryLocalCache,
+  Firestore
+} from 'firebase/firestore';
 
 export const firebaseConfig = {
   apiKey: "AIzaSyAZp4LnE9ITfExb72_DBGSRP5a171W_gvs",
@@ -11,7 +18,31 @@ export const firebaseConfig = {
   appId: "1:66128613083:web:2ce98eb4829efeea7d46fe"
 };
 
-// Initialize Firebase once
+// Initialize Firebase App once
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+
+// Initialize Firestore with experimentalForceLongPolling to eliminate the 10-second backend timeout in cloud / iframe / proxy environments
+let firestoreDb: Firestore;
+
+try {
+  firestoreDb = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+} catch (cacheErr) {
+  try {
+    firestoreDb = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: true,
+      localCache: memoryLocalCache()
+    });
+  } catch {
+    firestoreDb = getFirestore(app);
+  }
+}
+
+export const db = firestoreDb;

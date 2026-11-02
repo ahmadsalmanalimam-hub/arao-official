@@ -34,6 +34,26 @@ export interface PublishVideoInput {
   allowDownload?: boolean;
   visibility: 'public' | 'private';
   soundTitle?: string;
+  postType?: 'video' | 'photo_single' | 'photo_slideshow' | 'text';
+  mediaType?: 'video' | 'photo' | 'slideshow' | 'text';
+  photoUrls?: string[];
+  photoTransition?: 'fade' | 'zoom' | 'slide' | 'flip';
+  photoDuration?: number;
+  textPostData?: {
+    content: string;
+    text?: string;
+    bgGradient: string;
+    font: string;
+    animation?: string;
+    alignment?: 'left' | 'center' | 'right';
+  };
+  poll?: {
+    question: string;
+    options: { text: string; votes: number }[];
+    totalVotes?: number;
+    voterIds?: string[];
+    voters?: Record<string, number>;
+  };
 }
 
 export function extractHashtags(caption: string): string[] {
@@ -43,7 +63,7 @@ export function extractHashtags(caption: string): string[] {
 }
 
 /**
- * Publish a new video to Firestore
+ * Publish a new video, photo, slideshow, or text post
  */
 export async function publishVideo(input: PublishVideoInput): Promise<VideoItem> {
   const videosRef = collection(db, 'videos');
@@ -52,12 +72,18 @@ export async function publishVideo(input: PublishVideoInput): Promise<VideoItem>
     ? input.hashtags 
     : extractHashtags(input.caption);
 
-  const thumbUrl = input.thumbnailUrl || getCloudinaryThumbnailUrl(input.videoUrl);
+  const thumbUrl = input.thumbnailUrl || (input.photoUrls?.[0] || getCloudinaryThumbnailUrl(input.videoUrl));
 
-  const newVideo: Omit<VideoItem, 'id'> = {
+  const effectivePostType = input.postType || (
+    input.mediaType === 'text' ? 'text' :
+    input.photoUrls && input.photoUrls.length > 1 ? 'photo_slideshow' :
+    input.photoUrls && input.photoUrls.length === 1 ? 'photo_single' : 'video'
+  );
+
+  const newVideo: any = {
     videoId: videoDoc.id,
-    videoUrl: getOptimizedVideoUrl(input.videoUrl),
-    cloudinaryPublicId: input.cloudinaryPublicId,
+    videoUrl: input.mediaType === 'photo' || input.mediaType === 'slideshow' ? (input.photoUrls?.[0] || input.videoUrl) : getOptimizedVideoUrl(input.videoUrl),
+    cloudinaryPublicId: input.cloudinaryPublicId || 'media',
     thumbnailUrl: thumbUrl,
     userId: input.userId,
     username: input.username,
@@ -73,21 +99,132 @@ export async function publishVideo(input: PublishVideoInput): Promise<VideoItem>
     allowDownload: input.allowDownload !== false,
     visibility: input.visibility,
     soundTitle: input.soundTitle || `Original Sound - ${input.username}`,
+    postType: effectivePostType,
+    mediaType: input.mediaType || (effectivePostType.startsWith('photo') ? 'photo' : effectivePostType === 'text' ? 'text' : 'video'),
+    photoUrls: input.photoUrls || [],
+    photoTransition: input.photoTransition || 'fade',
+    photoDuration: input.photoDuration || 5,
+    textPostData: input.textPostData || undefined,
+    poll: input.poll || undefined,
+    repostCount: 0,
     createdAt: serverTimestamp()
   };
 
-  const batch = writeBatch(db);
-  batch.set(videoDoc, newVideo);
-  batch.update(doc(db, 'users', input.userId), {
-    videoCount: increment(1)
-  });
-
-  await batch.commit();
+  try {
+    const batch = writeBatch(db);
+    batch.set(videoDoc, newVideo);
+    batch.update(doc(db, 'users', input.userId), {
+      videoCount: increment(1)
+    });
+    await batch.commit();
+  } catch (err) {
+    console.warn('Firestore publish fallback to local persistence:', err);
+    try {
+      const stored = localStorage.getItem('arao_local_posts') || '[]';
+      const parsed = JSON.parse(stored);
+      parsed.unshift(newVideo);
+      localStorage.setItem('arao_local_posts', JSON.stringify(parsed));
+    } catch {}
+  }
 
   return {
     id: videoDoc.id,
     ...newVideo
   };
+}
+
+/**
+ * Toggle Pin video to top of Creator profile
+ */
+export async function togglePinUserVideo(userId: string, videoId: string): Promise<boolean> {
+  try {
+    const videoRef = doc(db, 'videos', videoId);
+    const snap = await getDoc(videoRef);
+    if (!snap.exists()) return false;
+    const current = snap.data()?.isPinned || false;
+    await setDoc(videoRef, { isPinned: !current }, { merge: true });
+    return !current;
+  } catch (err) {
+    console.error('togglePinUserVideo error:', err);
+    return false;
+  }
+}
+
+/**
+ * Cast a vote on a post poll
+ */
+export async function voteOnPostPoll(videoId: string, userId: string, optionIndex: number): Promise<any> {
+  try {
+    const videoRef = doc(db, 'videos', videoId);
+    const snap = await getDoc(videoRef);
+    if (!snap.exists()) return null;
+    const poll = snap.data()?.poll;
+    if (!poll || !poll.options[optionIndex]) return null;
+
+    const voters = poll.voters || {};
+    const previousVote = voters[userId];
+    if (previousVote !== undefined) {
+      if (previousVote === optionIndex) return poll;
+      poll.options[previousVote].votes = Math.max(0, poll.options[previousVote].votes - 1);
+    }
+
+    poll.options[optionIndex].votes += 1;
+    voters[userId] = optionIndex;
+    poll.voters = voters;
+
+    await setDoc(videoRef, { poll }, { merge: true });
+    return poll;
+  } catch (err) {
+    console.error('voteOnPostPoll error:', err);
+    return null;
+  }
+}
+
+/**
+ * Repost a video to user profile
+ */
+export async function repostVideo(
+  originalVideo: VideoItem,
+  user: { uid: string; username: string; avatar?: string }
+): Promise<VideoItem> {
+  const videosRef = collection(db, 'videos');
+  const videoDoc = doc(videosRef);
+
+  const repostItem: any = {
+    ...originalVideo,
+    videoId: videoDoc.id,
+    userId: user.uid,
+    username: user.username,
+    userAvatar: user.avatar || '',
+    isRepost: true,
+    originalPostId: originalVideo.videoId,
+    originalAuthor: originalVideo.username,
+    createdAt: serverTimestamp()
+  };
+
+  try {
+    await setDoc(videoDoc, repostItem);
+    // Increment original video repost count
+    const origRef = doc(db, 'videos', originalVideo.videoId);
+    await setDoc(origRef, { repostCount: (originalVideo.repostCount || 0) + 1 }, { merge: true });
+
+    // Send notification to original author
+    if (originalVideo.userId !== user.uid) {
+      await createNotification({
+        recipientId: originalVideo.userId,
+        senderId: user.uid,
+        senderUsername: user.username,
+        senderAvatar: user.avatar,
+        type: 'repost',
+        videoId: originalVideo.videoId,
+        text: `@${user.username} reposted your post`
+      });
+    }
+  } catch (err) {
+    console.error('repostVideo error:', err);
+  }
+
+  return { id: videoDoc.id, ...repostItem };
 }
 
 /**

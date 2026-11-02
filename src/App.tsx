@@ -11,12 +11,14 @@ import { ExplorePage } from './components/explore/ExplorePage';
 import { InboxPage } from './components/inbox/InboxPage';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { UploadModal } from './components/upload/UploadModal';
+import { CameraPage } from './components/camera/CameraPage';
 import { CommentSheet } from './components/comments/CommentSheet';
 import { ShareSheet } from './components/share/ShareSheet';
 import { AuthModal } from './components/auth/AuthModal';
 import { ReportModal } from './components/common/ReportModal';
 import { MonetizationModal } from './components/monetization/MonetizationModal';
 import { AdminPage } from './pages/Admin';
+import { StorePage } from './pages/Store';
 import { getSystemSettings, SUPER_ADMIN_EMAIL } from './services/adminService';
 import { VideoItem, SystemSettings } from './types';
 import { getVideoById } from './services/videoService';
@@ -32,6 +34,7 @@ function AraoMain() {
 
   // Modal states
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const [monetizationOpen, setMonetizationOpen] = useState(false);
   const [monetizationTab, setMonetizationTab] = useState<'earnings' | 'ads' | 'premium' | 'admin'>('earnings');
   const [activeCommentVideo, setActiveCommentVideo] = useState<VideoItem | null>(null);
@@ -56,6 +59,16 @@ function AraoMain() {
       window.location.hash === '#/admin'
     );
   });
+
+  // Store /store route state
+  const [isStoreRoute, setIsStoreRoute] = useState<boolean>(() => {
+    return (
+      window.location.pathname === '/store' ||
+      window.location.pathname.startsWith('/store') ||
+      window.location.search.includes('store') ||
+      window.location.hash === '#/store'
+    );
+  });
   const [systemSettings, setSystemSettings] = useState<SystemSettings | null>(null);
 
   useEffect(() => {
@@ -65,6 +78,12 @@ function AraoMain() {
         window.location.pathname.startsWith('/admin') ||
         window.location.search.includes('admin') ||
         window.location.hash === '#/admin'
+      );
+      setIsStoreRoute(
+        window.location.pathname === '/store' ||
+        window.location.pathname.startsWith('/store') ||
+        window.location.search.includes('store') ||
+        window.location.hash === '#/store'
       );
     };
     window.addEventListener('popstate', checkRoute);
@@ -83,11 +102,19 @@ function AraoMain() {
   const navigateToAdmin = () => {
     window.history.pushState({}, '', '/admin');
     setIsAdminRoute(true);
+    setIsStoreRoute(false);
+  };
+
+  const navigateToStore = () => {
+    window.history.pushState({}, '', '/store');
+    setIsStoreRoute(true);
+    setIsAdminRoute(false);
   };
 
   const navigateToHome = () => {
     window.history.pushState({}, '', '/');
     setIsAdminRoute(false);
+    setIsStoreRoute(false);
   };
 
   // Check URL query parameters for deep links, e.g. ?video=ID or ?profile=USERNAME
@@ -137,7 +164,7 @@ function AraoMain() {
         alert('Video uploads are temporarily paused for maintenance.');
         return;
       }
-      setUploadOpen(true);
+      setCameraOpen(true);
       return;
     }
 
@@ -176,6 +203,11 @@ function AraoMain() {
   // Render Admin Dashboard on /admin route
   if (isAdminRoute) {
     return <AdminPage onNavigateHome={navigateToHome} />;
+  }
+
+  // Render ARAO Store on /store route
+  if (isStoreRoute) {
+    return <StorePage onNavigateHome={navigateToHome} onOpenProfile={handleOpenProfile} />;
   }
 
   // Full-Screen Maintenance Screen if App Paused by Owner
@@ -250,6 +282,7 @@ function AraoMain() {
               setMonetizationTab(tab || 'earnings');
               setMonetizationOpen(true);
             }}
+            onOpenStore={navigateToStore}
           />
         )}
       </main>
@@ -326,6 +359,11 @@ function AraoMain() {
         defaultTab={monetizationTab}
         onClose={() => setMonetizationOpen(false)}
       />
+
+      {/* Camera Page */}
+      {cameraOpen && (
+        <CameraPage onClose={() => setCameraOpen(false)} />
+      )}
 
       {/* Auth Modal (Login / Register / Forgot Password) */}
       <AuthModal />

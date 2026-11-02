@@ -51,6 +51,7 @@ import {
   getPlatformMonetizationStats
 } from '../../services/monetizationService';
 import { updateUserProfile } from '../../services/userService';
+import { getPaymentSettings } from '../../services/supabaseService';
 
 interface MonetizationModalProps {
   isOpen: boolean;
@@ -102,12 +103,17 @@ export const MonetizationModal: React.FC<MonetizationModalProps> = ({
   // Premium state
   const [subscribing, setSubscribing] = useState(false);
   const [premiumSuccess, setPremiumSuccess] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings | null>(null);
 
   // Admin state
   const [adminStats, setAdminStats] = useState<any>(null);
   const [adminCampaigns, setAdminCampaigns] = useState<AdCampaign[]>([]);
   const [adminPayouts, setAdminPayouts] = useState<CreatorPayoutRequest[]>([]);
   const [adminLoading, setAdminLoading] = useState(false);
+
+  useEffect(() => {
+    getPaymentSettings().then(setPaymentSettings);
+  }, []);
 
   useEffect(() => {
     if (defaultTab) {
@@ -744,6 +750,33 @@ export const MonetizationModal: React.FC<MonetizationModalProps> = ({
                       <CheckCircle className="w-4 h-4 shrink-0 text-emerald-400" />
                       <span>Welcome to ARAO Premium! Your perks are active immediately.</span>
                     </div>
+                  )}
+
+                  {/* Payment Methods Section */}
+                  {paymentSettings && (
+                  <div className="mb-6 p-4 bg-black/40 rounded-2xl border border-purple-500/20">
+                    <h4 className="text-white font-bold text-sm mb-3">Official Payment Instructions</h4>
+                    <div className="text-xs text-gray-300 space-y-4">
+                      {paymentSettings.nigerianMethod.enabled && (
+                        <div className="p-3 bg-[#1A1926] rounded-xl border border-white/5">
+                            <p className="font-bold text-white mb-1">Nigerian Customers 🇳🇬</p>
+                            <p>Bank: {paymentSettings.nigerianMethod.bank} | Name: {paymentSettings.nigerianMethod.accountName} | Number: <span className="font-mono bg-black/50 px-1 py-0.5 rounded">{paymentSettings.nigerianMethod.accountNumber}</span></p>
+                        </div>
+                      )}
+                      {paymentSettings.internationalMethod.enabled && (
+                        <div className="p-3 bg-[#1A1926] rounded-xl border border-white/5">
+                            <p className="font-bold text-white mb-1">International Customers 🌍</p>
+                            <p>Method: {paymentSettings.internationalMethod.name} to {paymentSettings.internationalMethod.bank} Account: <span className="font-mono bg-black/50 px-1 py-0.5 rounded">{paymentSettings.internationalMethod.accountNumber}</span></p>
+                            <p className="text-[10px] mt-1 text-gray-400">{paymentSettings.internationalMethod.instructions}</p>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <button onClick={() => navigator.clipboard.writeText(paymentSettings.nigerianMethod.accountNumber)} className="text-[10px] bg-white/10 px-2 py-1 rounded">Copy Account Number</button>
+                        <button onClick={() => navigator.clipboard.writeText(paymentSettings.nigerianMethod.accountName)} className="text-[10px] bg-white/10 px-2 py-1 rounded">Copy Name</button>
+                        <a href={paymentSettings.whatsappSupportLink} target="_blank" rel="noopener noreferrer" className="text-[10px] bg-emerald-600 px-2 py-1 rounded">Contact Admin</a>
+                      </div>
+                    </div>
+                  </div>
                   )}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">

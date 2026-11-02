@@ -130,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               currentUser.uid,
               currentUser.email || '',
               defaultUser,
-              isMyAccount ? 'ARAO Official' : (currentUser.displayName || defaultUser),
+              isMyAccount ? 'Araoofficial' : (currentUser.displayName || defaultUser),
               currentUser.photoURL || getDefaultHumanAvatar(defaultUser)
             );
           } else if (p.avatar && p.avatar.includes('dicebear.com/7.x/bottts')) {
@@ -143,20 +143,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const userData: UserProfile = {
             ...p,
             username: isMyAccount ? 'arao' : p.username,
+            displayName: isMyAccount ? 'Araoofficial' : (p.displayName || p.username),
             email: userEmail || p.email,
             isVerified: isMyAccount || p.isVerified === true,
             isOfficial: isMyAccount || p.isOfficial === true,
-            role: isMyAccount ? 'admin' : (p.role || 'user'),
-            isPremium: isMyAccount ? true : (p.isPremium ?? false)
+            badgeType: isMyAccount ? 'creator_purple' : (p.badgeType || (p.isVerified ? 'creator_purple' : 'none')),
+            role: isMyAccount ? 'owner_admin' : (p.role || 'user'),
+            isPremium: isMyAccount ? true : (p.isPremium ?? false),
+            lastLogin: new Date().toISOString()
           };
 
-          if (isMyAccount && (!p.isVerified || !p.isOfficial || p.username !== 'arao')) {
+          if (isMyAccount && (!p.isVerified || !p.isOfficial || p.username !== 'arao' || p.role !== 'owner_admin' || p.displayName !== 'Araoofficial')) {
             await updateProfileDoc(currentUser.uid, {
               isVerified: true,
               isOfficial: true,
               username: 'arao',
               usernameLowercase: 'arao',
-              role: 'admin',
+              displayName: 'Araoofficial',
+              role: 'owner_admin',
+              badgeType: 'creator_purple',
               isPremium: true
             });
           }
@@ -200,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         cred.user.uid,
         userEmail || '',
         defaultUser,
-        isMyAccount ? 'ARAO Official' : (cred.user.displayName || defaultUser),
+        isMyAccount ? 'Araoofficial' : (cred.user.displayName || defaultUser),
         cred.user.photoURL || getDefaultHumanAvatar(defaultUser)
       );
     }
@@ -208,9 +213,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userData: UserProfile = {
       ...p,
       username: isMyAccount ? 'arao' : p.username,
+      displayName: isMyAccount ? 'Araoofficial' : (p.displayName || p.username),
       email: userEmail || p.email,
       isVerified: isMyAccount || p.isVerified === true,
-      isOfficial: isMyAccount || p.isOfficial === true
+      isOfficial: isMyAccount || p.isOfficial === true,
+      badgeType: isMyAccount ? 'creator_purple' : (p.badgeType || (p.isVerified ? 'creator_purple' : 'none')),
+      role: isMyAccount ? 'owner_admin' : (p.role || 'user'),
+      isPremium: isMyAccount ? true : (p.isPremium ?? false),
+      lastLogin: new Date().toISOString()
     };
 
     if (isMyAccount) {
@@ -219,6 +229,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOfficial: true,
         username: 'arao',
         usernameLowercase: 'arao',
+        displayName: 'Araoofficial',
+        role: 'owner_admin',
+        badgeType: 'creator_purple',
         email: userEmail
       });
     }
@@ -275,9 +288,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userData: UserProfile = {
       ...newProfile,
       username: isMyAccount ? 'arao' : targetUsername,
+      displayName: isMyAccount ? 'Araoofficial' : targetDisplayName,
       email: userEmail,
       isVerified: isMyAccount,
-      isOfficial: isMyAccount
+      isOfficial: isMyAccount,
+      badgeType: isMyAccount ? 'creator_purple' : 'none',
+      role: isMyAccount ? 'owner_admin' : 'user',
+      isPremium: isMyAccount ? true : false,
+      lastLogin: new Date().toISOString()
     };
 
     if (isMyAccount) {
@@ -286,6 +304,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isOfficial: true,
         username: 'arao',
         usernameLowercase: 'arao',
+        displayName: 'Araoofficial',
+        role: 'owner_admin',
+        badgeType: 'creator_purple',
         email: userEmail
       });
     }

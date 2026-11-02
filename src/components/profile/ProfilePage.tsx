@@ -18,7 +18,14 @@ import {
   X,
   Crown,
   Wallet,
-  Sparkles
+  Sparkles,
+  Music,
+  Layers,
+  ShoppingBag,
+  ShieldCheck,
+  Menu,
+  Pin,
+  FolderPlus
 } from 'lucide-react';
 import { UserProfile, VideoItem, WatchHistoryItem } from '../../types';
 import { useAuth } from '../../context/AuthContext';
@@ -35,23 +42,29 @@ import {
   deleteVideo,
   getWatchHistory,
   removeWatchHistoryItem,
-  clearWatchHistory
+  clearWatchHistory,
+  togglePinUserVideo
 } from '../../services/videoService';
 import { EditProfileModal } from './EditProfileModal';
 import { SettingsPage } from '../settings/SettingsPage';
 import { ChatModal } from '../inbox/ChatModal';
+import { VerifiedBadge } from '../common/VerifiedBadge';
+import { VerificationModal } from './VerificationModal';
+import { ProfileMenuDrawer } from './ProfileMenuDrawer';
 
 interface ProfilePageProps {
   viewUserId?: string;
   onSelectVideo: (video: VideoItem) => void;
   onOpenSelf?: () => void;
   onOpenMonetization?: (tab?: 'earnings' | 'ads' | 'premium' | 'admin') => void;
+  onOpenStore?: () => void;
 }
 
 export const ProfilePage: React.FC<ProfilePageProps> = ({
   viewUserId,
   onSelectVideo,
-  onOpenMonetization
+  onOpenMonetization,
+  onOpenStore
 }) => {
   const { user, profile: myProfile, openAuthModal } = useAuth();
 
@@ -70,6 +83,8 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [verificationModalOpen, setVerificationModalOpen] = useState(false);
+  const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -202,10 +217,42 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
+  const handleTogglePin = async (videoId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const isPinned = await togglePinUserVideo(user.uid, videoId);
+      setVideos((prev) =>
+        prev.map((v) => (v.videoId === videoId ? { ...v, isPinned } : v))
+      );
+      showToast(isPinned ? 'Post pinned to top of profile! 📌' : 'Post unpinned');
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const formatJoinDate = (createdAt: any) => {
     if (!createdAt) return 'Recently';
-    const date = createdAt.toDate ? createdAt.toDate() : new Date(createdAt.seconds ? createdAt.seconds * 1000 : createdAt);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    try {
+      let date: Date;
+      if (typeof createdAt?.toDate === 'function') {
+        date = createdAt.toDate();
+      } else if (createdAt?.seconds) {
+        date = new Date(createdAt.seconds * 1000);
+      } else if (createdAt?._seconds) {
+        date = new Date(createdAt._seconds * 1000);
+      } else if (typeof createdAt === 'string' || typeof createdAt === 'number') {
+        date = new Date(createdAt);
+      } else {
+        return 'Recently';
+      }
+      if (isNaN(date.getTime())) {
+        return 'Recently';
+      }
+      return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    } catch {
+      return 'Recently';
+    }
   };
 
   if (isOwnProfile && !user) {
@@ -279,13 +326,22 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               <Share2 className="w-4 h-4" />
             </button>
             {isOwnProfile && (
-              <button
-                onClick={() => setSettingsModalOpen(true)}
-                className="p-2 rounded-full bg-black/40 backdrop-blur-md text-white hover:text-[#8B00FF] border border-white/10"
-                title="Settings"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
+              <>
+                <button
+                  onClick={() => setMenuDrawerOpen(true)}
+                  className="p-2 rounded-full bg-black/40 backdrop-blur-md text-white hover:text-[#8B00FF] border border-white/10"
+                  title="ARAO Menu (Wallet, Activity, Offline, QR, Studio)"
+                >
+                  <Menu className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setSettingsModalOpen(true)}
+                  className="p-2 rounded-full bg-black/40 backdrop-blur-md text-white hover:text-[#8B00FF] border border-white/10"
+                  title="Settings"
+                >
+                  <Settings className="w-4 h-4" />
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -311,33 +367,38 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
         {/* Name and Verified Badge */}
         {(() => {
-          const isVerified =
+          const isOwnerAccount =
             profileData.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
+            (isOwnProfile && user?.email?.toLowerCase() === 'nasirandco001@gmail.com');
+
+          const isVerified: boolean = Boolean(
+            isOwnerAccount ||
             profileData.isVerified === true ||
             profileData.username?.toLowerCase() === 'arao' ||
             (isOwnProfile && (
-              user?.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
               myProfile?.isVerified === true ||
               myProfile?.username?.toLowerCase() === 'arao'
-            ));
+            ))
+          );
 
-          const isVIP =
+          const effectiveBadge = profileData.badgeType || (isVerified ? 'creator_purple' : 'none');
+
+          const isVIP: boolean = Boolean(
             profileData.isPremium ||
-            profileData.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
-            (isOwnProfile && (user?.email?.toLowerCase() === 'nasirandco001@gmail.com' || myProfile?.isPremium));
+            isOwnerAccount ||
+            (isOwnProfile && myProfile?.isPremium)
+          );
 
           return (
             <>
               <h1 className="text-lg font-bold flex items-center gap-1.5 text-white">
                 {profileData.displayName}
-                {isVerified && (
-                  <span
-                    className="w-4 h-4 rounded-full bg-gradient-to-tr from-[#7000FF] to-[#8B00FF] text-white font-bold text-[9px] inline-flex items-center justify-center shadow-[0_0_8px_rgba(139,0,255,0.7)]"
-                    title="Verified Official Account"
-                  >
-                    ✓
-                  </span>
-                )}
+                <VerifiedBadge
+                  badgeType={effectiveBadge}
+                  isVerified={isVerified}
+                  isBusiness={effectiveBadge === 'business_blue'}
+                  size="md"
+                />
                 {isVIP && (
                   <span
                     className="w-4 h-4 rounded-full bg-gradient-to-tr from-amber-400 to-yellow-200 text-black font-black text-[9px] inline-flex items-center justify-center shadow-[0_0_8px_rgba(251,191,36,0.6)]"
@@ -349,9 +410,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </h1>
               <div className="flex items-center gap-2 mt-0.5">
                 <p className="text-xs text-[#A5A5B5] font-mono">@{profileData.username}</p>
-                {isVerified && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#8B00FF]/25 text-[#D8B4FE] border border-[#8B00FF]/40 font-semibold tracking-wide">
-                    Official
+                {effectiveBadge === 'creator_purple' && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#8A2BE2]/25 text-[#D8B4FE] border border-[#8A2BE2]/40 font-semibold tracking-wide flex items-center gap-1">
+                    <VerifiedBadge badgeType="creator_purple" size="xs" showTooltip={false} /> Creator
+                  </span>
+                )}
+                {effectiveBadge === 'business_blue' && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1D9BF0]/25 text-sky-200 border border-[#1D9BF0]/40 font-semibold tracking-wide flex items-center gap-1">
+                    <VerifiedBadge badgeType="business_blue" size="xs" showTooltip={false} /> Business
                   </span>
                 )}
                 {isVIP && (
@@ -408,13 +474,14 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
         {/* Action Buttons */}
         <div className="flex items-center gap-2 mt-4 w-full max-w-sm">
           {isOwnProfile ? (
-            <div className="flex flex-col w-full">
+            <div className="flex flex-col w-full gap-2">
+              {/* Row 1: Edit Profile & Monetization */}
               <div className="flex items-center gap-2 w-full">
                 <button
                   onClick={() => setEditModalOpen(true)}
                   className="flex-1 py-2 px-3 bg-[#1A1926] hover:bg-purple-950/40 border border-purple-500/30 rounded-xl text-xs font-semibold text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <Edit3 className="w-3.5 h-3.5 text-[#8B00FF]" />
+                  <Edit3 className="w-3.5 h-3.5 text-[#8A2BE2]" />
                   <span>Edit Profile</span>
                 </button>
 
@@ -423,16 +490,44 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                   className="flex-1 py-2 px-3 bg-gradient-to-r from-purple-950/70 to-[#7000FF]/40 hover:from-purple-900/80 hover:to-[#7000FF]/60 border border-purple-500/40 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all shadow-[0_0_12px_rgba(139,0,255,0.25)] cursor-pointer"
                 >
                   <Wallet className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Monetization & Ads</span>
+                  <span>Monetization</span>
                 </button>
               </div>
+
+              {/* Row 2: Verification Application & ARAO Engagement Store */}
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  onClick={() => setVerificationModalOpen(true)}
+                  className="flex-1 py-2 px-3 bg-[#12121C] hover:bg-purple-950/30 border border-purple-500/30 rounded-xl text-xs font-semibold text-[#D8B4FE] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#8A2BE2]" />
+                  <span>{profileData.isVerified ? 'Verification Status' : 'Apply for Badge'}</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (onOpenStore) {
+                      onOpenStore();
+                    } else {
+                      window.history.pushState({}, '', '/store');
+                      window.dispatchEvent(new PopStateEvent('popstate'));
+                    }
+                  }}
+                  className="flex-1 py-2 px-3 bg-gradient-to-r from-purple-900/40 via-[#8A2BE2]/30 to-indigo-900/40 hover:opacity-90 border border-[#8A2BE2]/50 rounded-xl text-xs font-bold text-white flex items-center justify-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-yellow-400" />
+                  <span>ARAO Store</span>
+                </button>
+              </div>
+
+              {/* Row 3: Owner Admin Dashboard (strictly owner email) */}
               {user?.email?.toLowerCase() === 'nasirandco001@gmail.com' && (
                 <button
                   onClick={() => {
                     window.history.pushState({}, '', '/admin');
                     window.dispatchEvent(new PopStateEvent('popstate'));
                   }}
-                  className="w-full mt-2 py-2 px-3 bg-gradient-to-r from-amber-500/20 via-[#8B5CF6]/30 to-purple-900/30 hover:opacity-90 border border-[#8B5CF6]/50 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  className="w-full py-2 px-3 bg-gradient-to-r from-amber-500/20 via-[#8B5CF6]/30 to-purple-900/30 hover:opacity-90 border border-[#8B5CF6]/50 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-400" />
                   <span>Owner Admin Dashboard (/admin)</span>
@@ -484,6 +579,41 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
               </button>
             </>
           )}
+        </div>
+
+        {/* ARAO Premium VIP Card with Purple Gradient */}
+        <div className="w-full max-w-sm mt-3.5 p-3.5 rounded-2xl bg-gradient-to-r from-purple-950/80 via-[#7000FF]/25 to-purple-900/60 border border-purple-500/40 shadow-[0_0_25px_rgba(139,0,255,0.2)] text-left relative overflow-hidden group">
+          <div className="absolute top-0 right-0 -mr-6 -mt-6 w-24 h-24 rounded-full bg-purple-500/10 blur-xl pointer-events-none" />
+          <div className="flex items-start justify-between gap-3 relative z-10">
+            <div className="flex items-start gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-300 flex items-center justify-center text-black shadow-[0_0_15px_rgba(251,191,36,0.5)] shrink-0">
+                <Crown className="w-5 h-5 fill-black text-black" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold text-white tracking-wide">ARAO Premium VIP</h3>
+                  <span className="text-[9px] font-black uppercase px-1.5 py-0.2 rounded bg-amber-400 text-black">
+                    PRO
+                  </span>
+                </div>
+                <p className="text-[10px] text-purple-200/80 mt-0.5 leading-snug">
+                  100% ad-free stream, 2x Creator Coins earnings, HD 4K uploads & exclusive VIP badge
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="mt-2.5 pt-2 border-t border-purple-500/20 flex items-center justify-between">
+            <span className="text-[10px] font-mono text-amber-300">
+              {profileData.isPremium ? '✓ Active VIP Member' : 'From $4.99 / mo'}
+            </span>
+            <button
+              onClick={() => onOpenMonetization?.('premium')}
+              className="py-1 px-3 rounded-lg bg-gradient-to-r from-[#7000FF] to-[#8B00FF] hover:from-[#8B00FF] hover:to-[#9D4EDD] text-white text-[11px] font-bold shadow-[0_0_12px_rgba(139,0,255,0.4)] transition-all cursor-pointer flex items-center gap-1"
+            >
+              <Crown className="w-3 h-3 text-amber-300" />
+              <span>{profileData.isPremium ? 'Manage VIP' : 'Upgrade to VIP'}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -549,7 +679,7 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-2">
-              {videos.map((video) => (
+              {[...videos].sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)).map((video) => (
                 <div
                   key={video.videoId || video.id}
                   onClick={() => onSelectVideo(video)}
@@ -560,6 +690,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                     alt={video.caption}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                   />
+                  {/* Pinned Badge on top-left */}
+                  {video.isPinned && (
+                    <div className="absolute top-1.5 left-1.5 z-10 px-1.5 py-0.5 rounded-md bg-[#8A2BE2] text-white text-[9px] font-bold flex items-center gap-1 shadow-md">
+                      <Pin className="w-2.5 h-2.5 fill-white" />
+                      <span>Pinned</span>
+                    </div>
+                  )}
+                  {/* Slideshow / Photo indicator */}
+                  {((video as any).mediaType === 'photo' || (video as any).mediaType === 'slideshow' || Boolean((video as any).photoUrls?.length)) && (
+                    <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-10 px-1.5 py-0.5 rounded-md bg-black/70 backdrop-blur-md border border-white/15 text-white text-[9px] shadow-sm">
+                      <Layers className="w-2.5 h-2.5 text-purple-300" />
+                      <Music className="w-2.5 h-2.5 text-amber-300" />
+                    </div>
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-transparent flex flex-col justify-end p-1.5">
                     <div className="flex items-center justify-between text-[10px] text-white font-semibold">
                       <span className="flex items-center gap-0.5">
@@ -567,13 +711,24 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                         {video.viewsCount || 0}
                       </span>
                       {isOwnProfile && (
-                        <button
-                          onClick={(e) => handleDeleteVideo(video.videoId, e)}
-                          className="p-1 rounded-md bg-black/60 text-red-400 hover:text-red-300 transition-colors"
-                          title="Delete video"
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleTogglePin(video.videoId, e)}
+                            className={`p-1 rounded-md transition-colors ${
+                              video.isPinned ? 'bg-amber-400 text-black' : 'bg-black/60 text-gray-300 hover:text-white'
+                            }`}
+                            title={video.isPinned ? 'Unpin post' : 'Pin to top of profile'}
+                          >
+                            <Pin className="w-2.5 h-2.5" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteVideo(video.videoId, e)}
+                            className="p-1 rounded-md bg-black/60 text-red-400 hover:text-red-300 transition-colors"
+                            title="Delete post"
+                          >
+                            <Trash2 className="w-2.5 h-2.5" />
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -695,6 +850,27 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
           onOpenProfile={() => {}}
         />
       )}
+
+      {/* Verification Application Modal */}
+      <VerificationModal
+        isOpen={verificationModalOpen}
+        onClose={() => setVerificationModalOpen(false)}
+        onSubmitted={() => {
+          setToastMessage('Verification request submitted for admin review!');
+          loadProfileAndContent();
+        }}
+      />
+
+      {/* Grouped Profile Hamburger Menu Drawer */}
+      <ProfileMenuDrawer
+        isOpen={menuDrawerOpen}
+        onClose={() => setMenuDrawerOpen(false)}
+        profile={profileData}
+        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenStore={onOpenStore}
+        onOpenMonetization={onOpenMonetization}
+        onSelectVideo={onSelectVideo}
+      />
     </div>
   );
 };

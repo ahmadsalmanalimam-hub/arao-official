@@ -96,10 +96,21 @@ export async function sendMessage(
   conversationId: string,
   senderId: string,
   receiverId: string,
-  text: string
+  text: string,
+  options?: {
+    mediaUrl?: string;
+    mediaType?: 'image' | 'text' | 'voice';
+    voiceDuration?: number;
+    status?: 'sending' | 'sent' | 'delivered' | 'read';
+  }
 ): Promise<MessageItem> {
-  const cleanText = text.trim();
-  if (!cleanText) throw new Error('Message cannot be empty');
+  const cleanText =
+    text.trim() ||
+    (options?.mediaType === 'voice'
+      ? '🎤 Voice note'
+      : options?.mediaType === 'image'
+      ? '📷 Photo'
+      : 'Message');
 
   const messagesRef = collection(db, 'messages');
   const msgDoc = doc(messagesRef);
@@ -112,18 +123,26 @@ export async function sendMessage(
     receiverId,
     text: cleanText,
     read: false,
+    status: options?.status || 'delivered',
+    mediaUrl: options?.mediaUrl,
+    mediaType: options?.mediaType,
+    voiceDuration: options?.voiceDuration,
     createdAt: serverTimestamp()
   };
 
-  await setDoc(msgDoc, newMsg);
+  try {
+    await setDoc(msgDoc, newMsg);
 
-  // Update conversation lastMessage
-  const convRef = doc(db, 'conversations', conversationId);
-  await updateDoc(convRef, {
-    lastMessage: cleanText,
-    lastSenderId: senderId,
-    updatedAt: serverTimestamp()
-  });
+    // Update conversation lastMessage
+    const convRef = doc(db, 'conversations', conversationId);
+    await updateDoc(convRef, {
+      lastMessage: cleanText,
+      lastSenderId: senderId,
+      updatedAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.warn('Firestore write warning:', e);
+  }
 
   return newMsg;
 }

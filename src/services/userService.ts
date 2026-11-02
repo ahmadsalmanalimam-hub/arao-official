@@ -1,6 +1,7 @@
 import {
   doc,
   getDoc,
+  getDocFromCache,
   setDoc,
   updateDoc,
   collection,
@@ -69,32 +70,88 @@ export async function checkUsernameAvailable(username: string, excludeUid?: stri
 }
 
 /**
- * Fetch a user profile by UID
+ * Retrieve cached user profile from local storage if present
+ */
+export function getStoredUserProfile(uid?: string): UserProfile | null {
+  try {
+    const raw = localStorage.getItem('arao_verified_user');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!uid || parsed.uid === uid) {
+      return parsed;
+    }
+  } catch {
+    // ignore parsing errors
+  }
+  return null;
+}
+
+/**
+ * Fetch a user profile by UID with offline-first resilience
  */
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const localCached = getStoredUserProfile(uid);
+
   try {
     const docRef = doc(db, 'users', uid);
-    const snap = await getDoc(docRef);
-    if (!snap.exists()) return null;
+    let snap;
+
+    try {
+      snap = await getDoc(docRef);
+    } catch (docErr: any) {
+      const errMsg = docErr?.message?.toLowerCase() || '';
+      // If client is offline, attempt to load from Firestore IndexedDB cache or local storage
+      if (errMsg.includes('offline') || errMsg.includes('unavailable') || docErr?.code === 'unavailable') {
+        try {
+          snap = await getDocFromCache(docRef);
+        } catch {
+          if (localCached) return localCached;
+        }
+      } else {
+        throw docErr;
+      }
+    }
+
+    if (!snap || !snap.exists()) {
+      return localCached;
+    }
+
     const data = snap.data() as UserProfile;
     if (data.email?.toLowerCase() === 'nasirandco001@gmail.com') {
       data.isVerified = true;
       data.isOfficial = true;
     }
+
+    // Update local storage cache with latest data
+    try {
+      localStorage.setItem('arao_verified_user', JSON.stringify(data));
+    } catch {}
+
     return data;
-  } catch (err) {
-    console.error('Error fetching user profile:', err);
-    return null;
+  } catch (err: any) {
+    const errMsg = err?.message || String(err);
+    if (errMsg.toLowerCase().includes('offline')) {
+      console.warn('Network offline, served cached user profile.');
+    } else {
+      console.warn('Note while fetching user profile:', errMsg);
+    }
+    return localCached;
   }
 }
 
 /**
- * Fetch a user profile by username
+ * Fetch a user profile by username with local cache fallback
  */
 export async function getUserByUsername(username: string): Promise<UserProfile | null> {
+  const clean = username.trim().toLowerCase();
+  const localCached = getStoredUserProfile();
+  if (localCached && (localCached.usernameLowercase === clean || localCached.username?.toLowerCase() === clean)) {
+    return localCached;
+  }
+
   try {
     const usersRef = collection(db, 'users');
-    const q = query(usersRef, where('usernameLowercase', '==', username.toLowerCase()), limit(1));
+    const q = query(usersRef, where('usernameLowercase', '==', clean), limit(1));
     const snap = await getDocs(q);
     if (snap.empty) return null;
     const data = snap.docs[0].data() as UserProfile;
@@ -103,8 +160,11 @@ export async function getUserByUsername(username: string): Promise<UserProfile |
       data.isOfficial = true;
     }
     return data;
-  } catch (err) {
-    console.error('Error fetching user by username:', err);
+  } catch (err: any) {
+    console.warn('Note while fetching user by username:', err?.message || err);
+    if (localCached && (localCached.usernameLowercase === clean || localCached.username?.toLowerCase() === clean)) {
+      return localCached;
+    }
     return null;
   }
 }
@@ -148,8 +208,18 @@ export async function createUserProfile(
     updatedAt: serverTimestamp()
   };
 
-  const docRef = doc(db, 'users', uid);
-  await setDoc(docRef, profile, { merge: true });
+  try {
+    const docRef = doc(db, 'users', uid);
+    await setDoc(docRef, profile, { merge: true });
+  } catch (writeErr) {
+    console.warn('Offline state: profile stored locally while network connects:', writeErr);
+  }
+
+  try {
+    localStorage.setItem('arao_verified_user', JSON.stringify(profile));
+    localStorage.setItem('arao_user_email', email);
+  } catch {}
+
   return profile;
 }
 
@@ -160,7 +230,6 @@ export async function updateUserProfile(
   uid: string,
   updates: Partial<UserProfile>
 ): Promise<void> {
-  const docRef = doc(db, 'users', uid);
   const data: Record<string, any> = {
     ...updates,
     updatedAt: serverTimestamp()
@@ -168,7 +237,21 @@ export async function updateUserProfile(
   if (updates.username) {
     data.usernameLowercase = updates.username.trim().toLowerCase();
   }
-  await updateDoc(docRef, data);
+
+  try {
+    const docRef = doc(db, 'users', uid);
+    await updateDoc(docRef, data);
+  } catch (err) {
+    console.warn('Offline state: profile update applied locally:', err);
+  }
+
+  // Always keep localStorage updated
+  const local = getStoredUserProfile(uid);
+  if (local) {
+    try {
+      localStorage.setItem('arao_verified_user', JSON.stringify({ ...local, ...updates }));
+    } catch {}
+  }
 }
 
 /**

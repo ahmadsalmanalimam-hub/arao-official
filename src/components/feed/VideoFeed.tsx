@@ -13,7 +13,10 @@ import {
 import { getActiveAdCampaigns } from '../../services/monetizationService';
 import { useAuth } from '../../context/AuthContext';
 import { CategoryPanel, CATEGORIES_LIST } from './CategoryPanel';
-import { RefreshCw, ChevronDown, Search, Sparkles, UserCheck, Flame, Crown } from 'lucide-react';
+import { StoriesBar, StoryItem } from '../stories/StoriesBar';
+import { StoryViewerModal } from '../stories/StoryViewerModal';
+import { LiveRoomModal } from '../live/LiveRoomModal';
+import { RefreshCw, ChevronDown, Search, Sparkles, UserCheck, Flame, Crown, Radio, Zap } from 'lucide-react';
 
 export type FeedItem =
   | { type: 'video'; data: VideoItem }
@@ -47,6 +50,9 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
 
   const [activeTab, setActiveTab] = useState<'foryou' | 'trending' | 'following' | string>('foryou');
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
+  const [storiesOpen, setStoriesOpen] = useState(false);
+  const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [liveRoomOpen, setLiveRoomOpen] = useState(false);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [hiddenAdIds, setHiddenAdIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,53 +169,77 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
     <div className="relative w-full h-[100dvh] bg-[#080810] overflow-hidden select-none">
       {/* Top Header Floating Nav: ONLY 3 main categories + chevron button */}
       <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between px-4 pt-4 pb-2 bg-gradient-to-b from-black/85 via-black/40 to-transparent pointer-events-auto">
-        {/* Brand / Search icon on left */}
-        <button
-          onClick={onOpenSearch}
-          className="p-2 rounded-full text-gray-300 hover:text-white transition-colors"
-          title="Search ARAO"
-        >
-          <Search className="w-5 h-5" />
-        </button>
+        {/* Brand / Search & Live / Stories buttons on left */}
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={onOpenSearch}
+            className="p-1.5 rounded-full text-gray-300 hover:text-white transition-colors"
+            title="Search ARAO"
+          >
+            <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button>
 
-        {/* 3 Main Header Tabs: For You | Trending | Following ▾ */}
-        <div className="flex items-center gap-4 sm:gap-6">
+          <button
+            onClick={() => setLiveRoomOpen(true)}
+            className="flex items-center gap-1 py-1 px-2 rounded-full bg-red-950/60 hover:bg-red-900/60 border border-red-500/40 text-[10px] font-bold text-red-400 tracking-wider transition-all cursor-pointer"
+            title="Watch ARAO Live Stream"
+          >
+            <Radio className="w-2.5 h-2.5 animate-pulse" />
+            <span className="hidden sm:inline">LIVE</span>
+          </button>
+
+          <button
+            onClick={() => setStoriesOpen(!storiesOpen)}
+            className={`flex items-center gap-1 py-1 px-2 rounded-full border text-[10px] font-semibold transition-all cursor-pointer ${
+              storiesOpen
+                ? 'bg-[#8B00FF]/30 border-[#8B00FF] text-white shadow-[0_0_10px_rgba(139,0,255,0.4)]'
+                : 'bg-black/40 border-white/10 text-gray-400 hover:text-white'
+            }`}
+            title="Toggle 24h Stories Tray"
+          >
+            <Zap className="w-2.5 h-2.5 text-purple-300" />
+            <span className="hidden sm:inline">Stories</span>
+          </button>
+        </div>
+
+        {/* 3 Main Header Tabs: For You | Trending | Following ▾ (Equal small size & weight, single horizontal row) */}
+        <div className="flex items-center gap-2.5 sm:gap-4 whitespace-nowrap">
           {/* 1. For You */}
           <button
             onClick={() => handleTabChange('foryou')}
-            className={`text-sm font-bold tracking-wide transition-all ${
+            className={`text-xs sm:text-sm font-semibold tracking-wide transition-colors pb-0.5 whitespace-nowrap inline-flex items-center ${
               activeTab === 'foryou'
-                ? 'text-white border-b-2 border-[#8B00FF] pb-0.5 scale-105'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-white border-b-2 border-[#8B00FF]'
+                : 'text-gray-400 hover:text-gray-200'
             }`}
           >
             For You
           </button>
 
-          <span className="text-gray-700 text-xs">|</span>
+          <span className="text-gray-700 text-xs select-none">|</span>
 
           {/* 2. Trending */}
           <button
             onClick={() => handleTabChange('trending')}
-            className={`text-sm font-bold tracking-wide transition-all flex items-center gap-1 ${
+            className={`text-xs sm:text-sm font-semibold tracking-wide transition-colors pb-0.5 whitespace-nowrap inline-flex items-center ${
               activeTab === 'trending'
-                ? 'text-white border-b-2 border-[#8B00FF] pb-0.5 scale-105'
-                : 'text-gray-400 hover:text-white'
+                ? 'text-white border-b-2 border-[#8B00FF]'
+                : 'text-gray-400 hover:text-gray-200'
             }`}
           >
-            <span>Trending</span>
+            Trending
           </button>
 
-          <span className="text-gray-700 text-xs">|</span>
+          <span className="text-gray-700 text-xs select-none">|</span>
 
           {/* 3. Following + Small downward chevron */}
-          <div className="flex items-center">
+          <div className="flex items-center whitespace-nowrap">
             <button
               onClick={() => handleTabChange('following')}
-              className={`text-sm font-bold tracking-wide transition-all ${
+              className={`text-xs sm:text-sm font-semibold tracking-wide transition-colors pb-0.5 whitespace-nowrap inline-flex items-center ${
                 activeTab === 'following'
-                  ? 'text-white border-b-2 border-[#8B00FF] pb-0.5 scale-105'
-                  : 'text-gray-400 hover:text-white'
+                  ? 'text-white border-b-2 border-[#8B00FF]'
+                : 'text-gray-400 hover:text-gray-200'
               }`}
             >
               Following
@@ -218,39 +248,40 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
             {/* Downward Chevron Button to open Expandable Category Panel */}
             <button
               onClick={() => setCategoryPanelOpen(true)}
-              className="ml-1 p-1 text-gray-400 hover:text-[#8B00FF] transition-colors rounded-full"
-              title="Browse categories"
+              className="ml-0.5 p-1 text-gray-400 hover:text-[#8B00FF] transition-colors rounded-full"
+              title="More Categories"
               aria-label="Expand category menu"
             >
-              <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+              <ChevronDown className="w-3.5 h-3.5 stroke-[2.5]" />
             </button>
           </div>
         </div>
 
-        {/* Monetization button & Reload button on right */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => onOpenMonetization?.(profile?.isPremium ? 'earnings' : 'premium')}
-            className={`p-2 rounded-full transition-all flex items-center justify-center ${
-              profile?.isPremium
-                ? 'text-amber-300 hover:text-amber-200 bg-amber-400/15 border border-amber-400/40 shadow-[0_0_10px_rgba(251,191,36,0.2)]'
-                : 'text-gray-300 hover:text-[#8B00FF] bg-black/40 hover:bg-black/60 border border-white/10'
-            }`}
-            title={profile?.isPremium ? 'ARAO Premium VIP Active' : 'ARAO Monetization & Ads'}
-          >
-            {profile?.isPremium ? <Crown className="w-4 h-4 text-amber-400" /> : <Sparkles className="w-4 h-4 text-[#D8B4FE]" />}
-          </button>
-
+        {/* Right Action: Clean reload button (Crown moved to Profile page) */}
+        <div className="flex items-center">
           <button
             onClick={() => loadFeed(activeTab, true)}
             disabled={refreshing}
-            className="p-2 text-gray-300 hover:text-[#8B00FF] transition-colors"
+            className="p-2 text-gray-300 hover:text-[#8B00FF] transition-colors rounded-full hover:bg-black/40"
             title="Refresh feed"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin text-[#8B00FF]' : ''}`} />
           </button>
         </div>
       </div>
+
+      {/* 24-Hour Ephemeral Stories Tray */}
+      {storiesOpen && (
+        <div className="absolute top-14 inset-x-0 z-30 animate-fade-in shadow-2xl">
+          <StoriesBar
+            onSelectStory={(_story, idx) => setActiveStoryIndex(idx)}
+            onOpenLive={() => setLiveRoomOpen(true)}
+            onAddStory={() => {
+              alert('Click the (+) Create button on bottom navigation to post your 24h video story!');
+            }}
+          />
+        </div>
+      )}
 
       {/* Selected Category Tag Banner (if user selected one from the expandable panel) */}
       {activeCategoryLabel && (
@@ -348,6 +379,21 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
         onClose={() => setCategoryPanelOpen(false)}
         selectedCategory={activeTab}
         onSelectCategory={(catId) => handleTabChange(catId)}
+      />
+
+      {/* 24h Story Viewer Modal */}
+      {activeStoryIndex !== null && (
+        <StoryViewerModal
+          initialStoryIndex={activeStoryIndex}
+          onClose={() => setActiveStoryIndex(null)}
+          onOpenProfile={onOpenProfile}
+        />
+      )}
+
+      {/* ARAO Live Stream Room Modal */}
+      <LiveRoomModal
+        isOpen={liveRoomOpen}
+        onClose={() => setLiveRoomOpen(false)}
       />
     </div>
   );

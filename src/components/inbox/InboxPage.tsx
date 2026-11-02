@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, MessageSquare, CheckCheck, Heart, UserPlus, CornerDownRight, MessageCircle, Loader2 } from 'lucide-react';
+import { Bell, MessageSquare, CheckCheck, Heart, UserPlus, CornerDownRight, MessageCircle, Loader2, AtSign } from 'lucide-react';
 import { NotificationItem, ConversationItem, UserProfile } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getUserNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '../../services/notificationService';
@@ -175,13 +175,16 @@ export const InboxPage: React.FC<InboxPageProps> = ({
         ) : (
           <div className="space-y-2.5">
             {notifications.map((notif) => {
-              const iconMap = {
+              const iconMap: Record<string, any> = {
                 like: <Heart className="w-3.5 h-3.5 text-[#FF1744] fill-[#FF1744]" />,
                 comment: <MessageCircle className="w-3.5 h-3.5 text-[#8B00FF]" />,
                 reply: <CornerDownRight className="w-3.5 h-3.5 text-[#8B00FF]" />,
                 follow: <UserPlus className="w-3.5 h-3.5 text-blue-400" />,
                 follow_request: <UserPlus className="w-3.5 h-3.5 text-purple-400" />,
-                follow_accept: <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+                follow_accept: <UserPlus className="w-3.5 h-3.5 text-emerald-400" />,
+                mention: <AtSign className="w-3.5 h-3.5 text-pink-400" />,
+                message: <MessageCircle className="w-3.5 h-3.5 text-purple-400" />,
+                story_reply: <Heart className="w-3.5 h-3.5 text-pink-400" />
               };
 
               return (
