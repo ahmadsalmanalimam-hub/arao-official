@@ -5,23 +5,26 @@ import { useAuth } from '../../context/AuthContext';
 
 interface StoryViewerModalProps {
   initialStoryIndex: number;
+  stories?: StoryItem[];
   onClose: () => void;
   onOpenProfile?: (userId: string) => void;
 }
 
 export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
   initialStoryIndex,
+  stories,
   onClose,
   onOpenProfile
 }) => {
   const { user } = useAuth();
+  const storyList = stories && stories.length > 0 ? stories : SAMPLE_STORIES;
   const [currentIndex, setCurrentIndex] = useState(initialStoryIndex);
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [replyText, setReplyText] = useState('');
   const [reactionToast, setReactionToast] = useState<string | null>(null);
 
-  const currentStory = SAMPLE_STORIES[currentIndex];
+  const currentStory = storyList[currentIndex] || storyList[0];
 
   useEffect(() => {
     setProgress(0);
@@ -31,7 +34,7 @@ export const StoryViewerModal: React.FC<StoryViewerModalProps> = ({
     if (isPaused) return;
 
     if (progress >= 100) {
-      if (currentIndex < SAMPLE_STORIES.length - 1) {
+      if (currentIndex < storyList.length - 1) {
         setCurrentIndex((c) => c + 1);
         setProgress(0);
       } else {

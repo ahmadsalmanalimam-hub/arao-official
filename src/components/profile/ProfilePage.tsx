@@ -343,6 +343,18 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </button>
               </>
             )}
+            {!isOwnProfile && (
+              <button
+                onClick={() => {
+                  // Implement report logic
+                  console.log('Report user:', profileData.username);
+                }}
+                className="p-2 rounded-full bg-black/40 backdrop-blur-md text-white hover:text-red-400 border border-white/10"
+                title="Report user"
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -367,9 +379,10 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
 
         {/* Name and Verified Badge */}
         {(() => {
+          const adminEmails = ['ahmadsalmanalimam@gmail.com', 'nasirandco001@gmail.com'];
           const isOwnerAccount =
-            profileData.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
-            (isOwnProfile && user?.email?.toLowerCase() === 'nasirandco001@gmail.com');
+            adminEmails.includes(profileData.email?.toLowerCase() || '') ||
+            (isOwnProfile && adminEmails.includes(user?.email?.toLowerCase() || ''));
 
           const isVerified: boolean = Boolean(
             isOwnerAccount ||
@@ -520,17 +533,20 @@ export const ProfilePage: React.FC<ProfilePageProps> = ({
                 </button>
               </div>
 
-              {/* Row 3: Owner Admin Dashboard (strictly owner email) */}
-              {user?.email?.toLowerCase() === 'nasirandco001@gmail.com' && (
+              {/* Row 3: Admin Dashboard (strictly authorized admins) */}
+              {(user?.email?.toLowerCase() === 'ahmadsalmanalimam@gmail.com' ||
+                user?.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
+                myProfile?.role === 'admin' ||
+                myProfile?.role === 'owner_admin') && (
                 <button
                   onClick={() => {
                     window.history.pushState({}, '', '/admin');
                     window.dispatchEvent(new PopStateEvent('popstate'));
                   }}
-                  className="w-full py-2 px-3 bg-gradient-to-r from-amber-500/20 via-[#8B5CF6]/30 to-purple-900/30 hover:opacity-90 border border-[#8B5CF6]/50 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
+                  className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500/20 via-[#8B5CF6]/30 to-purple-900/30 hover:opacity-90 border border-[#8B5CF6]/50 rounded-xl text-xs font-black text-white flex items-center justify-center gap-1.5 transition-all shadow-md cursor-pointer"
                 >
                   <Crown className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Owner Admin Dashboard (/admin)</span>
+                  <span>Admin Dashboard (/admin)</span>
                 </button>
               )}
             </div>

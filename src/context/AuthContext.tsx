@@ -51,7 +51,18 @@ const defaultSettings: UserSettings = {
   notificationsMessage: true
 };
 
+export const ADMIN_EMAILS = [
+  'ahmadsalmanalimam@gmail.com',
+  'nasirandco001@gmail.com'
+];
+
 export const MY_EMAIL = 'nasirandco001@gmail.com';
+
+export const isSuperAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const clean = email.toLowerCase().trim();
+  return ADMIN_EMAILS.some((adm) => adm.toLowerCase() === clean);
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -116,9 +127,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         try {
           const userEmail = currentUser.email?.toLowerCase();
-          const isMyAccount = userEmail === MY_EMAIL.toLowerCase();
+          const isMyAccount = isSuperAdminEmail(userEmail);
 
           let p = await getUserProfile(currentUser.uid);
+          if (p && p.isBanned && !isMyAccount) {
+            const isExpired = p.bannedUntil && p.bannedUntil !== 'forever' && Date.now() > new Date(p.bannedUntil).getTime();
+            if (isExpired) {
+              await updateProfileDoc(currentUser.uid, { isBanned: false, bannedUntil: undefined, banReason: undefined });
+              p.isBanned = false;
+            } else {
+              const untilDate = !p.bannedUntil || p.bannedUntil === 'forever'
+                ? 'Forever'
+                : new Date(p.bannedUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              const reason = p.banReason || 'Community Guidelines Violation';
+              const banMsg = `You are banned. Reason: ${reason}. Until: ${untilDate}. Tap to Appeal`;
+              await signOut(auth);
+              setUser(null);
+              setProfile(null);
+              localStorage.removeItem('arao_verified_user');
+              localStorage.removeItem('arao_user_email');
+              window.dispatchEvent(
+                new CustomEvent('arao_user_banned_attempt', {
+                  detail: {
+                    message: banMsg,
+                    reason,
+                    untilDate,
+                    userId: p.uid,
+                    username: p.username,
+                    email: userEmail || p.email
+                  }
+                })
+              );
+              return;
+            }
+          }
           if (!p) {
             const defaultUser = isMyAccount
               ? 'arao'
@@ -191,9 +233,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, pass: string) => {
     const cred = await signInWithEmailAndPassword(auth, email.trim(), pass);
     const userEmail = cred.user.email?.toLowerCase();
-    const isMyAccount = userEmail === MY_EMAIL.toLowerCase();
+    const isMyAccount = isSuperAdminEmail(userEmail);
 
     let p = await getUserProfile(cred.user.uid);
+    if (p && p.isBanned && !isMyAccount) {
+      const untilDate = !p.bannedUntil || p.bannedUntil === 'forever'
+        ? 'Forever'
+        : new Date(p.bannedUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const reason = p.banReason || 'Community Guidelines Violation';
+      const banMsg = `You are banned. Reason: ${reason}. Until: ${untilDate}. Contact @araoofficial`;
+      await signOut(auth);
+      setUser(null);
+      setProfile(null);
+      throw new Error(banMsg);
+    }
     if (!p) {
       const defaultUser = isMyAccount
         ? 'arao'

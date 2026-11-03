@@ -19,6 +19,7 @@ import { db } from '../lib/firebase';
 import { VideoItem, WatchHistoryItem } from '../types';
 import { createNotification } from './notificationService';
 import { getOptimizedVideoUrl, getCloudinaryThumbnailUrl } from '../lib/cloudinary';
+import { recordRealPostView } from './supabaseService';
 
 export interface PublishVideoInput {
   videoUrl: string;
@@ -420,14 +421,30 @@ export async function getVideoById(videoId: string): Promise<VideoItem | null> {
 }
 
 /**
- * Increment view count
+ * Real View System: 1 Person = 1 View
+ * Inserts into post_views with unique (post_id, viewer_user_id) constraint.
+ * If user has viewed before, DO NOT count again even if viewed 100 times daily.
  */
-export async function incrementVideoViews(videoId: string): Promise<void> {
+export async function incrementVideoViews(videoId: string, viewerUserId?: string): Promise<void> {
   try {
-    const videoRef = doc(db, 'videos', videoId);
-    await setDoc(videoRef, { viewsCount: increment(1) }, { merge: true });
+    let viewerId = viewerUserId;
+    if (!viewerId) {
+      viewerId = localStorage.getItem('arao_viewer_session_id') || '';
+      if (!viewerId) {
+        viewerId = `guest_${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem('arao_viewer_session_id', viewerId);
+      }
+    }
+
+    const res = await recordRealPostView(videoId, viewerId);
+    if (res.isNewView) {
+      try {
+        const videoRef = doc(db, 'videos', videoId);
+        await setDoc(videoRef, { viewsCount: res.viewCount }, { merge: true });
+      } catch {}
+    }
   } catch (err) {
-    console.error('Error incrementing view count:', err);
+    console.error('Error recording real view count:', err);
   }
 }
 

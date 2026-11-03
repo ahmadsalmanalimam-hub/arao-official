@@ -146,7 +146,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
         playPromise
           .then(() => {
             setIsPlaying(true);
-            incrementVideoViews(video.videoId);
+            incrementVideoViews(video.videoId, user?.uid);
             if (user) {
               recordWatchHistory(user.uid, video);
             }
@@ -466,25 +466,6 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
       {/* Top Floating Controls */}
       <div className="absolute top-14 right-3 z-30 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-        {/* Sound toggle */}
-        <button
-          onClick={onToggleSound}
-          className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white hover:text-[#8B00FF] transition-colors"
-          aria-label={soundEnabled ? 'Mute audio' : 'Unmute audio'}
-        >
-          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4 text-gray-400" />}
-        </button>
-
-        {/* Report video */}
-        {onOpenReport && (
-          <button
-            onClick={() => onOpenReport(video.videoId, video.userId)}
-            className="p-2 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-white/70 hover:text-red-400 transition-colors"
-            title="Report video"
-          >
-            <Flag className="w-3.5 h-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Floating Download Toast */}

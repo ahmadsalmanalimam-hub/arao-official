@@ -52,6 +52,7 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
   const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [storiesOpen, setStoriesOpen] = useState(false);
   const [activeStoryIndex, setActiveStoryIndex] = useState<number | null>(null);
+  const [currentStories, setCurrentStories] = useState<any[] | null>(null);
   const [liveRoomOpen, setLiveRoomOpen] = useState(false);
   const [feedItems, setFeedItems] = useState<FeedItem[]>([]);
   const [hiddenAdIds, setHiddenAdIds] = useState<string[]>([]);
@@ -274,10 +275,13 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
       {storiesOpen && (
         <div className="absolute top-14 inset-x-0 z-30 animate-fade-in shadow-2xl">
           <StoriesBar
-            onSelectStory={(_story, idx) => setActiveStoryIndex(idx)}
+            onSelectStory={(_story, idx, allStories) => {
+              if (allStories) setCurrentStories(allStories);
+              setActiveStoryIndex(idx);
+            }}
             onOpenLive={() => setLiveRoomOpen(true)}
             onAddStory={() => {
-              alert('Click the (+) Create button on bottom navigation to post your 24h video story!');
+              window.dispatchEvent(new CustomEvent('arao_open_camera_for_story'));
             }}
           />
         </div>
@@ -385,7 +389,11 @@ export const VideoFeed: React.FC<VideoFeedProps> = ({
       {activeStoryIndex !== null && (
         <StoryViewerModal
           initialStoryIndex={activeStoryIndex}
-          onClose={() => setActiveStoryIndex(null)}
+          stories={currentStories || undefined}
+          onClose={() => {
+            setActiveStoryIndex(null);
+            setCurrentStories(null);
+          }}
           onOpenProfile={onOpenProfile}
         />
       )}

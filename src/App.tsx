@@ -95,8 +95,13 @@ function AraoMain() {
     const handleSettingsChange = (e: any) => {
       if (e.detail) setSystemSettings(e.detail);
     };
+    const handleOpenStoryCamera = () => setCameraOpen(true);
     window.addEventListener('arao_system_settings_changed', handleSettingsChange);
-    return () => window.removeEventListener('arao_system_settings_changed', handleSettingsChange);
+    window.addEventListener('arao_open_camera_for_story', handleOpenStoryCamera);
+    return () => {
+      window.removeEventListener('arao_system_settings_changed', handleSettingsChange);
+      window.removeEventListener('arao_open_camera_for_story', handleOpenStoryCamera);
+    };
   }, []);
 
   const navigateToAdmin = () => {

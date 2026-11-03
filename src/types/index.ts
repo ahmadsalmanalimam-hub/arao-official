@@ -41,6 +41,8 @@ export interface UserProfile {
   badgeType?: BadgeType;
   allowDownloadDefault?: boolean;
   // Monetization & Subscription fields
+  accountType?: 'normal' | 'creator' | 'business';
+  totalRealViews?: number;
   isPremium?: boolean;
   premiumTier?: 'monthly' | 'yearly';
   premiumExpiresAt?: any;
@@ -49,10 +51,31 @@ export interface UserProfile {
   totalLifetimeEarned?: number;
   role?: UserRole;
   isBanned?: boolean;
+  banReason?: string;
+  bannedUntil?: string; // 'forever' or ISO string
+  isShadowBanned?: boolean;
+  coinsBalance?: number;
+  giftEarningsCoins?: number;
+  giftEarningsNaira?: number;
   lastLogin?: any;
   createdAt: any;
   updatedAt: any;
 }
+
+export interface BanAppeal {
+  id: string;
+  userId: string;
+  username: string;
+  email: string;
+  banReason: string;
+  appealText: string;
+  status: 'pending' | 'approved' | 'rejected';
+  createdAt: any;
+  reviewedAt?: any;
+  reviewedBy?: string;
+  adminNotes?: string;
+}
+
 
 export type AdCtaType = 'Learn More' | 'Shop Now' | 'Visit Website' | 'Sign Up' | 'Download' | 'Book Now';
 
@@ -489,6 +512,49 @@ export interface AdminLog {
   targetType?: string;
   details?: Record<string, any>;
   ipAddress?: string;
+  createdAt: any;
+}
+
+export interface VirtualGift {
+  id: string;
+  name: string;
+  icon: string; // Emoji or asset
+  coins: number;
+  nairaValue: number;
+  animationType: 'sparkle' | 'flame' | 'explosion' | 'royal' | 'cosmic' | 'roar';
+  description: string;
+}
+
+export interface GiftTransaction {
+  id: string;
+  senderId: string;
+  senderUsername: string;
+  senderAvatar?: string;
+  recipientId: string;
+  recipientUsername: string;
+  giftId: string;
+  giftName: string;
+  giftIcon: string;
+  coins: number;
+  nairaValue: number;
+  liveSessionId?: string;
+  createdAt: any;
+}
+
+export interface AdminReportRecord {
+  id: string;
+  reportedUserId: string;
+  reportedUsername: string;
+  reportedDisplayName?: string;
+  reportedAvatar?: string;
+  postId?: string;
+  postCaption?: string;
+  postMediaUrl?: string;
+  reporterCount: number;
+  reporters: string[];
+  reason: string;
+  status: 'pending' | 'resolved' | 'dismissed';
+  actionTaken?: 'deleted_post' | 'warned' | 'banned_7_days' | 'banned_forever' | 'dismissed';
   createdAt: any;
 }
 

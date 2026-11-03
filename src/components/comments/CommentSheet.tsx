@@ -4,6 +4,7 @@ import { VideoItem, CommentItem } from '../../types';
 import { useAuth } from '../../context/AuthContext';
 import { getCommentsForVideo, addComment, deleteComment, toggleLikeComment } from '../../services/commentService';
 import { getDefaultHumanAvatar } from '../../services/userService';
+import { VerifiedBadge } from '../common/VerifiedBadge';
 
 interface CommentSheetProps {
   video: VideoItem | null;
@@ -183,18 +184,14 @@ export const CommentSheet: React.FC<CommentSheetProps> = ({
                       className="text-xs font-semibold text-gray-200 hover:text-[#D8B4FE] transition-colors flex items-center gap-1"
                     >
                       <span>@{comment.username}</span>
-                      {(comment.username?.toLowerCase() === 'arao' ||
-                        (user?.uid === comment.userId &&
-                          (user?.email?.toLowerCase() === 'nasirandco001@gmail.com' ||
-                            profile?.isVerified === true ||
-                            profile?.username?.toLowerCase() === 'arao'))) && (
-                        <span
-                          className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-[#7000FF] to-[#8B00FF] text-white text-[8px] font-bold inline-flex items-center justify-center shadow-sm"
-                          title="Verified Official Account"
-                        >
-                          ✓
-                        </span>
-                      )}
+                      <VerifiedBadge
+                        isVerified={
+                          (comment as any).isVerified === true ||
+                          comment.username?.toLowerCase() === 'arao' ||
+                          (user?.uid === comment.userId && profile?.isVerified === true)
+                        }
+                        size="xs"
+                      />
                     </button>
                     {video.userId === comment.userId && (
                       <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-[#8B00FF]/20 text-[#D8B4FE] border border-[#8B00FF]/30 font-medium">

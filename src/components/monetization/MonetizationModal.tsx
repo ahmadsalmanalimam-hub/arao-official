@@ -34,7 +34,8 @@ import {
   CreatorEarningsData,
   CreatorPayoutRequest,
   MonetizationTransaction,
-  VideoCategory
+  VideoCategory,
+  PaymentSettings
 } from '../../types';
 import {
   getCreatorEarnings,

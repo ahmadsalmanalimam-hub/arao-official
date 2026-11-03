@@ -6,6 +6,7 @@ interface VerifiedBadgeProps {
   badgeType?: BadgeType;
   isVerified?: boolean;
   isBusiness?: boolean;
+  isCreator?: boolean;
   size?: 'xs' | 'sm' | 'md' | 'lg';
   className?: string;
   showTooltip?: boolean;
@@ -15,16 +16,19 @@ export const VerifiedBadge: React.FC<VerifiedBadgeProps> = ({
   badgeType,
   isVerified,
   isBusiness,
+  isCreator,
   size = 'sm',
   className = '',
   showTooltip = true
 }) => {
-  // Determine effective badge type
+  // Determine effective badge type: Creator Purple (#8A2BE2) vs Business Blue (#1D9BF0)
   let effectiveBadge: BadgeType = 'none';
   if (badgeType && badgeType !== 'none') {
     effectiveBadge = badgeType;
   } else if (isBusiness) {
     effectiveBadge = 'business_blue';
+  } else if (isCreator) {
+    effectiveBadge = 'creator_purple';
   } else if (isVerified) {
     effectiveBadge = 'creator_purple';
   }

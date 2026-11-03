@@ -277,6 +277,31 @@ export const ProfileMenuDrawer: React.FC<ProfileMenuDrawerProps> = ({
                 </div>
                 <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-white transition-colors" />
               </button>
+
+              {/* 7. Report User */}
+              {user?.uid !== profile.uid && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    // Implement report user logic here (call report modal)
+                    console.log('Report user:', profile.username);
+                  }}
+                  className="w-full p-3 rounded-2xl bg-red-950/20 hover:bg-red-950/40 border border-red-500/15 flex items-center justify-between text-left transition-colors cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 flex items-center justify-center">
+                      <Shield className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold text-red-200 block group-hover:text-red-100 transition-colors">
+                        Report @{profile.username}
+                      </span>
+                      <span className="text-[10px] text-red-400">Flag for violation</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-red-500 group-hover:text-red-300 transition-colors" />
+                </button>
+              )}
             </div>
 
             {/* ARAO Store Banner */}
