@@ -50,6 +50,8 @@ import {
   banUserWithDuration,
   unbanUser,
   toggleShadowBan,
+  toggleFreezeUser,
+  toggleShadowFreezeUser,
   verifyUserAsCreator,
   verifyUserAsBusiness,
   removeUserVerification,
@@ -70,8 +72,8 @@ interface AdminPageProps {
   onOpenProfile?: (userId: string) => void;
 }
 
-type AdminTab = 'users' | 'reports' | 'verification' | 'banned' | 'appeals' | 'payments' | 'logs';
-type UserFilter = 'all' | 'verified' | 'banned' | 'creator' | 'business' | 'reported';
+type AdminTab = 'users' | 'reports' | 'verification' | 'banned' | 'appeals' | 'payments' | 'logs' | 'freeze';
+type UserFilter = 'all' | 'verified' | 'banned' | 'creator' | 'business' | 'reported' | 'online' | 'offline' | 'never_active';
 
 export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProfile }) => {
   const { user, profile, login } = useAuth();
@@ -291,6 +293,28 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
     }
   };
 
+  const handleToggleFreeze = async (u: UserProfile) => {
+    const nextState = !u.isFrozen;
+    try {
+      await toggleFreezeUser(u.uid, u.username, nextState, currentUserEmail);
+      showToast(nextState ? `Frozen @${u.username} ❄️` : `Unfrozen @${u.username}`);
+      setUsers((prev) => prev.map((item) => (item.uid === u.uid ? { ...item, isFrozen: nextState } : item)));
+    } catch (err: any) {
+      showToast('Error: ' + err.message);
+    }
+  };
+
+  const handleToggleShadowFreeze = async (u: UserProfile) => {
+    const nextState = !u.isShadowFreeze;
+    try {
+      await toggleShadowFreezeUser(u.uid, u.username, nextState, currentUserEmail);
+      showToast(nextState ? `Shadow Frozen @${u.username} 👻` : `Removed shadow freeze for @${u.username}`);
+      setUsers((prev) => prev.map((item) => (item.uid === u.uid ? { ...item, isShadowFreeze: nextState } : item)));
+    } catch (err: any) {
+      showToast('Error: ' + err.message);
+    }
+  };
+
   // 2. VERIFICATION REQUEST ACTIONS
   const handleApproveVerification = async (req: VerificationRequest) => {
     try {
@@ -379,6 +403,12 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
   };
 
   // Filtered and Searched Users Table
+  const isOnline = (u: UserProfile) => {
+    if (!u.lastLogin) return false;
+    const lastLogin = new Date(u.lastLogin).getTime();
+    return Date.now() - lastLogin < 5 * 60 * 1000; // 5 mins
+  };
+
   const filteredUsers = useMemo(() => {
     const reportedUserIds = new Set(reports.map((r) => r.reportedUserId));
 
@@ -398,6 +428,9 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
       if (userFilter === 'creator') return u.accountType === 'creator' || u.badgeType === 'creator_purple';
       if (userFilter === 'business') return u.accountType === 'business' || u.badgeType === 'business_blue';
       if (userFilter === 'reported') return reportedUserIds.has(u.uid);
+      if (userFilter === 'online') return isOnline(u);
+      if (userFilter === 'offline') return !isOnline(u);
+      if (userFilter === 'never_active') return !u.lastLogin;
 
       return true;
     });
@@ -599,6 +632,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
             { id: 'verification', label: 'Verification', icon: BadgeCheck, badge: pendingVerifsCount },
             { id: 'banned', label: 'Banned', icon: Ban, badge: bannedUsers.length },
             { id: 'appeals', label: 'Appeals', icon: FileText, badge: pendingAppealsCount },
+            { id: 'freeze', label: 'Freeze List', icon: Lock, badge: users.filter(u => u.isFrozen).length },
             { id: 'payments', label: 'Payment Settings', icon: CreditCard },
             { id: 'logs', label: 'Admin Logs', icon: Clock }
           ].map((tab) => {
@@ -689,6 +723,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                       <th className="py-3 px-4">Total Real Views</th>
                       <th className="py-3 px-4">Verified</th>
                       <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4">Online</th>
                       <th className="py-3 px-4">Joined Date</th>
                       <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
@@ -696,14 +731,14 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                   <tbody className="divide-y divide-white/5 font-sans">
                     {loadingUsers ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-gray-400">
+                        <td colSpan={10} className="py-12 text-center text-gray-400">
                           <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-400" />
                           <span>Loading users registry...</span>
                         </td>
                       </tr>
                     ) : filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-gray-400">
+                        <td colSpan={10} className="py-12 text-center text-gray-400">
                           No users matched your query or filter.
                         </td>
                       </tr>
@@ -712,6 +747,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                         const isCreator = u.accountType === 'creator' || u.badgeType === 'creator_purple';
                         const isBusiness = u.accountType === 'business' || u.badgeType === 'business_blue';
                         const joinedStr = u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'Recent';
+                        const online = isOnline(u);
 
                         return (
                           <tr key={u.uid} className="hover:bg-white/[0.02] transition-colors">
@@ -785,7 +821,11 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-950/80 text-red-300 border border-red-500/40">
                                   Banned
                                 </span>
-                              ) : u.isShadowBanned ? (
+                              ) : u.isFrozen ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-500/40">
+                                  Frozen
+                                </span>
+                              ) : u.isShadowBanned || u.isShadowFreeze ? (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950/80 text-amber-300 border border-amber-500/40">
                                   Shadow
                                 </span>
@@ -793,6 +833,18 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40">
                                   Active
                                 </span>
+                              )}
+                            </td>
+
+                            {/* Online Status */}
+                            <td className="py-3 px-4">
+                              {online ? (
+                                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-bold">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  Online
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-gray-500">Offline</span>
                               )}
                             </td>
 
@@ -854,7 +906,20 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                                     <Ban className="w-3.5 h-3.5" />
                                   </button>
                                 )}
-
+                                
+                                {/* Freeze Toggle */}
+                                <button
+                                    onClick={() => handleToggleFreeze(u)}
+                                    className={`p-1.5 rounded-lg transition-colors ${
+                                      u.isFrozen
+                                        ? 'bg-cyan-600 text-white'
+                                        : 'bg-white/5 hover:bg-white/10 text-gray-400'
+                                    }`}
+                                    title={u.isFrozen ? 'Unfreeze' : 'Freeze'}
+                                >
+                                  <Lock className="w-3.5 h-3.5" />
+                                </button>
+                                
                                 {/* Shadow Ban toggle */}
                                 <button
                                   onClick={() => handleToggleShadowBan(u)}
@@ -866,6 +931,19 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                                   title={u.isShadowBanned ? 'Remove Shadow Ban' : 'Shadow Ban User'}
                                 >
                                   <Ghost className="w-3.5 h-3.5" />
+                                </button>
+                                
+                                {/* Shadow Freeze toggle */}
+                                <button
+                                  onClick={() => handleToggleShadowFreeze(u)}
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    u.isShadowFreeze
+                                      ? 'bg-purple-600 text-white'
+                                      : 'bg-white/5 hover:bg-white/10 text-gray-400'
+                                  }`}
+                                  title={u.isShadowFreeze ? 'Remove Shadow Freeze' : 'Shadow Freeze User'}
+                                >
+                                  <Layers className="w-3.5 h-3.5" />
                                 </button>
 
                                 {/* View All Posts */}
@@ -898,6 +976,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
                 </table>
               </div>
             </div>
+
           </section>
         )}
 
@@ -1193,7 +1272,56 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
         )}
 
         {/* ============================================================== */}
-        {/* TAB 6: PAYMENT SETTINGS (Owner Admin Payment Configuration)    */}
+        {/* TAB 7: FREEZE LIST                                             */}
+        {/* ============================================================== */}
+        {activeTab === 'freeze' && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                Frozen & Shadow Frozen Accounts
+              </h3>
+              <span className="text-xs text-gray-400">Total Frozen: {users.filter(u => u.isFrozen).length}</span>
+            </div>
+
+            <div className="grid gap-3.5">
+              {users.filter(u => u.isFrozen).length === 0 ? (
+                <div className="py-12 text-center text-gray-400 bg-[#12121C] border border-white/5 rounded-2xl">
+                  No accounts are currently frozen.
+                </div>
+              ) : (
+                users.filter(u => u.isFrozen).map((u) => (
+                  <div
+                    key={u.uid}
+                    className="p-4 rounded-2xl bg-[#12121C] border border-cyan-500/30 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white text-sm">@{u.username}</span>
+                        <span className="text-xs text-gray-400 font-mono">({u.email})</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950 text-cyan-300 border border-cyan-500/40">
+                          Frozen
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 font-mono">
+                        Frozen Until: <span className="text-cyan-300">{u.freezeUntil ? new Date(u.freezeUntil).toLocaleString() : 'Unknown'}</span>
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => handleToggleFreeze(u)}
+                      className="py-2 px-4 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md cursor-pointer transition-all active:scale-98 shrink-0"
+                    >
+                      Unfreeze Account
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* ============================================================== */}
+        {/* TAB 8: PAYMENT SETTINGS (Owner Admin Payment Configuration)    */}
         {/* ============================================================== */}
         {activeTab === 'payments' && (
           <section className="space-y-4">
@@ -1202,7 +1330,7 @@ export const AdminPage: React.FC<AdminPageProps> = ({ onNavigateHome, onOpenProf
         )}
 
         {/* ============================================================== */}
-        {/* TAB 7: ADMIN ACTIVITY LOGS                                     */}
+        {/* TAB 9: ADMIN ACTIVITY LOGS                                     */}
         {/* ============================================================== */}
         {activeTab === 'logs' && (
           <section className="space-y-4">

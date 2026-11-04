@@ -192,6 +192,10 @@ export async function fetchAllUsersForAdmin(): Promise<UserProfile[]> {
           banReason: u.ban_reason,
           bannedUntil: u.banned_until,
           isShadowBanned: u.is_shadow_banned || false,
+          isFrozen: u.is_frozen || false,
+          freezeUntil: u.freeze_until,
+          isShadowFreeze: u.is_shadow_freeze || false,
+          shadowFreezeUntil: u.shadow_freeze_until,
           lastLogin: u.last_login || u.created_at,
           createdAt: u.created_at,
           updatedAt: u.updated_at
@@ -199,152 +203,9 @@ export async function fetchAllUsersForAdmin(): Promise<UserProfile[]> {
       });
     }
   } catch (err) {
-    console.warn('Supabase fetchAllUsers failed, falling back to local registry:', err);
+    console.warn('Supabase fetchAllUsers failed:', err);
   }
-
-  // Fallback to local stored registry with owner seed
-  const stored = localStorage.getItem('arao_admin_users_cache');
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
-  }
-
-  // Default seed accounts representing all account types with real engagement metrics
-  const seedUsers: UserProfile[] = [
-    {
-      uid: 'arao_owner_nasir',
-      email: OWNER_EMAIL,
-      phone: '+2348000000000',
-      username: OWNER_USERNAME,
-      usernameLowercase: OWNER_USERNAME,
-      displayName: OWNER_DISPLAY_NAME,
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
-      bio: 'Official ARAO Platform Owner & Founder. Building the next generation of African and global creator media.',
-      followersCount: 52400,
-      followingCount: 14,
-      videoCount: 18,
-      totalLikesCount: 182300,
-      totalRealViews: 245000,
-      accountType: 'creator',
-      isPrivate: false,
-      isVerified: true,
-      isOfficial: true,
-      badgeType: 'creator_purple',
-      role: 'owner_admin',
-      isPremium: true,
-      isBanned: false,
-      lastLogin: new Date().toISOString(),
-      createdAt: '2024-01-01T00:00:00.000Z',
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: 'u_beats_official',
-      email: 'creator@beats.com',
-      username: 'beatsaudio',
-      usernameLowercase: 'beatsaudio',
-      displayName: 'Beats Sound Brand',
-      avatar: 'https://images.unsplash.com/photo-1546435770-a3e426bf472b?w=300&auto=format&fit=crop&q=80',
-      bio: 'Official Beats Sound Nigeria enterprise account.',
-      followersCount: 18900,
-      followingCount: 24,
-      videoCount: 14,
-      totalLikesCount: 65400,
-      totalRealViews: 112800,
-      accountType: 'business',
-      isPrivate: false,
-      isVerified: true,
-      isOfficial: true,
-      badgeType: 'business_blue',
-      role: 'advertiser',
-      isPremium: true,
-      isBanned: false,
-      lastLogin: new Date().toISOString(),
-      createdAt: '2024-02-15T10:00:00.000Z',
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: 'u_dj_lagos',
-      email: 'djlagos@vibes.ng',
-      username: 'dj_lagos',
-      usernameLowercase: 'dj_lagos',
-      displayName: 'DJ Lagos King 🎧',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&q=80',
-      bio: 'Afrobeats mixes & live sets in Lagos. Verified creator.',
-      followersCount: 12450,
-      followingCount: 130,
-      videoCount: 22,
-      totalLikesCount: 48900,
-      totalRealViews: 89400,
-      accountType: 'creator',
-      isPrivate: false,
-      isVerified: true,
-      isOfficial: false,
-      badgeType: 'creator_purple',
-      role: 'creator',
-      isPremium: false,
-      isBanned: false,
-      lastLogin: new Date().toISOString(),
-      createdAt: '2024-03-01T12:00:00.000Z',
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: 'u_tunde_fan',
-      email: 'tunde@afrobeats.ng',
-      username: 'tunde_lagos',
-      usernameLowercase: 'tunde_lagos',
-      displayName: 'Tunde Adeleke',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&q=80',
-      bio: 'Music enthusiast and active community member in Ikeja.',
-      followersCount: 840,
-      followingCount: 310,
-      videoCount: 6,
-      totalLikesCount: 2150,
-      totalRealViews: 5400,
-      accountType: 'normal',
-      isPrivate: false,
-      isVerified: false,
-      isOfficial: false,
-      badgeType: 'none',
-      role: 'user',
-      isPremium: false,
-      isBanned: false,
-      lastLogin: new Date().toISOString(),
-      createdAt: '2024-04-10T08:30:00.000Z',
-      updatedAt: new Date().toISOString()
-    },
-    {
-      uid: 'u_badboy_02',
-      email: 'badboy@arao.net',
-      username: 'BadBoy',
-      usernameLowercase: 'badboy',
-      displayName: 'Bad Boy ⚠️',
-      avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=200&q=80',
-      bio: 'Account suspended for policy violations.',
-      followersCount: 420,
-      followingCount: 12,
-      videoCount: 1,
-      totalLikesCount: 85,
-      totalRealViews: 190,
-      accountType: 'normal',
-      isPrivate: false,
-      isVerified: false,
-      isOfficial: false,
-      badgeType: 'none',
-      role: 'user',
-      isPremium: false,
-      isBanned: true,
-      banReason: 'Porn / Inappropriate content',
-      bannedUntil: 'forever',
-      lastLogin: new Date().toISOString(),
-      createdAt: '2024-04-12T14:20:00.000Z',
-      updatedAt: new Date().toISOString()
-    }
-  ];
-
-  localStorage.setItem('arao_admin_users_cache', JSON.stringify(seedUsers));
-  return seedUsers;
+  return [];
 }
 
 export async function updateUserRoleAndBadge(
@@ -607,6 +468,57 @@ export async function removeUserVerification(
   );
 
   await logAdminAction(adminEmail, adminEmail, 'REMOVE_VERIFICATION', uid, 'user', { username });
+}
+
+/**
+ * Freeze User for 48 hours
+ */
+export async function toggleFreezeUser(
+  uid: string,
+  username: string,
+  isFrozen: boolean,
+  adminEmail: string
+): Promise<void> {
+  const freezeUntil = isFrozen ? new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString() : null;
+  try {
+    await supabase
+      .from('users')
+      .update({
+        is_frozen: isFrozen,
+        freeze_until: freezeUntil,
+        updated_at: new Date().toISOString()
+      })
+      .eq('uid', uid);
+  } catch (err) {
+    console.warn('Supabase freeze update fallback:', err);
+  }
+
+  await logAdminAction(adminEmail, adminEmail, isFrozen ? 'FREEZE_USER' : 'UNFREEZE_USER', uid, 'user', { username, isFrozen });
+}
+
+/**
+ * Toggle Shadow Freeze (user posts, nobody sees)
+ */
+export async function toggleShadowFreezeUser(
+  uid: string,
+  username: string,
+  isShadowFreeze: boolean,
+  adminEmail: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('users')
+      .update({
+        is_shadow_freeze: isShadowFreeze,
+        shadow_freeze_until: isShadowFreeze ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() : null, // Default 1 week
+        updated_at: new Date().toISOString()
+      })
+      .eq('uid', uid);
+  } catch (err) {
+    console.warn('Supabase shadow freeze update fallback:', err);
+  }
+
+  await logAdminAction(adminEmail, adminEmail, isShadowFreeze ? 'SHADOW_FREEZE_USER' : 'UNSHADOW_FREEZE_USER', uid, 'user', { username, isShadowFreeze });
 }
 
 // Initial sample reports matching user prompt:

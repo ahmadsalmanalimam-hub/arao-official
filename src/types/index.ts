@@ -53,7 +53,11 @@ export interface UserProfile {
   isBanned?: boolean;
   banReason?: string;
   bannedUntil?: string; // 'forever' or ISO string
+  isFrozen?: boolean;
+  freezeUntil?: string; // ISO string for 48h
   isShadowBanned?: boolean;
+  isShadowFreeze?: boolean;
+  shadowFreezeUntil?: string; // ISO string
   coinsBalance?: number;
   giftEarningsCoins?: number;
   giftEarningsNaira?: number;
